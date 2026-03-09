@@ -9,7 +9,7 @@ ELEMENT_CATEGORIES = {
         "elements": [
             "DYNAMIC", "STAFF_TEXT", "SYSTEM_TEXT", "REHEARSAL_MARK",
             "FERMATA", "ARTICULATION", "HARMONY", "FINGERING",
-            "TEMPO_TEXT", "INSTRUMENT_CHANGE",
+            "TEMPO_TEXT", "INSTRUMENT_CHANGE", "KEYSIG", "BAR_LINE",
         ],
     },
     "cmd_shortcut": {
@@ -87,6 +87,16 @@ ELEMENT_INFO: Dict[str, Dict[str, Any]] = {
         },
         "example": {"text": "1"},
     },
+    "TEMPO_TEXT": {
+        "description": "Tempo marking. Prefer set_tempo() for standard tempo changes; "
+                       "use this for custom tempo text without BPM effect.",
+        "category": "cursor_attached",
+        "common_properties": {
+            "text": "string — display text",
+            "tempo": "float — tempo in beats per second (BPM / 60)",
+        },
+        "example": {"text": "Andante", "tempo": 1.33},
+    },
     "INSTRUMENT_CHANGE": {
         "description": "Instrument change marking at a point in the score",
         "category": "cursor_attached",
@@ -94,6 +104,25 @@ ELEMENT_INFO: Dict[str, Dict[str, Any]] = {
             "text": "string — instrument change label",
         },
         "example": {"text": "Mute"},
+    },
+    "KEYSIG": {
+        "description": "Key signature. Set the key using the 'key' property "
+                       "(negative = flats, 0 = C major, positive = sharps).",
+        "category": "cursor_attached",
+        "common_properties": {
+            "key": "int — number of sharps (positive) or flats (negative). "
+                   "E.g. -3 = Eb major, 0 = C major, 2 = D major",
+        },
+        "example": {"key": -3},
+    },
+    "BAR_LINE": {
+        "description": "Bar line. Set subtype for different styles: "
+                       "normal, double, start-repeat, end-repeat, end-start-repeat, end.",
+        "category": "cursor_attached",
+        "common_properties": {
+            "subtypeName": "string — bar line type name",
+        },
+        "example": {},
     },
     "SLUR": {
         "description": "Slur connecting notes. Select start note, call add_slur(), "

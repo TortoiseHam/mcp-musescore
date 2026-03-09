@@ -332,7 +332,7 @@ MuseScore {
             "goToBeginningOfScore", "setTimeSignature", "addLyrics", "addInstrument",    
             "setStaffMute", "setInstrumentSound", "setTempo",
             "addCursorElement", "addSlur", "addTie", "addHairpin",
-            "setVoice"
+            "setVoice", "selectCustomRange", "syncStateToSelection"
         ];
 
         try {
@@ -770,6 +770,7 @@ MuseScore {
             }
 
             cursor.add(elem);
+            syncStateToSelection();
 
             return {
                 success: true,

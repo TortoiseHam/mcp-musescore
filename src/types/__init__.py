@@ -35,9 +35,13 @@ __all__ = [
     "SelectCustomRangeAction",
     "SyncStateToSelectionAction",
     "AddCursorElementAction",
+    "AddCursorElementParams",
     "AddSlurAction",
     "AddTieAction",
     "AddHairpinAction",
+    "AddHairpinParams",
     "ExportPdfAction",
+    "ExportPdfParams",
     "SetVoiceAction",
+    "SetVoiceParams",
 ]
