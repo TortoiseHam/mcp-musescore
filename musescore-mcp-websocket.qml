@@ -8,6 +8,7 @@ MuseScore {
     version: "2.0"
     
     property var clientConnections: []
+    property bool serverRunning: false
     property var selectionState: ({
         startStaff: 0,
         endStaff: 1,
@@ -46,6 +47,7 @@ MuseScore {
             case "syncStateToSelection":    return syncStateToSelection();
             case "ping":                    return "pong";
             case "undo":                    return undo();
+            case "describeElement":         return describeElement(command.params);
             case "goToBeginningOfScore":    return goToBeginningOfScore();
             case "processSequence":         return processSequence(command.params);
 
@@ -248,10 +250,42 @@ MuseScore {
     // ========================================
 
     function undo() {
-        return executeWithUndo(function() {
-            cmd("undo");
-            return { success: true, message: "Undo successful" };
-        });
+        cmd("undo");
+        return { success: true, message: "Undo successful" };
+    }
+
+    function describeElement(params) {
+        if (!params || !params.elementType) {
+            return { error: "elementType is required" };
+        }
+
+        var elementType = Element[params.elementType];
+        if (elementType === undefined) {
+            return { error: "Unknown element type: " + params.elementType };
+        }
+
+        try {
+            var elem = newElement(elementType);
+            var properties = {};
+
+            Object.keys(elem).forEach(function(key) {
+                var val = elem[key];
+                if (val !== undefined && typeof val !== "function") {
+                    try {
+                        properties[key] = String(val);
+                    } catch (e) {
+                        properties[key] = "(unreadable)";
+                    }
+                }
+            });
+
+            return {
+                elementType: params.elementType,
+                properties: properties
+            };
+        } catch (e) {
+            return { error: e.toString() };
+        }
     }
 
     function goToBeginningOfScore() {
@@ -271,20 +305,22 @@ MuseScore {
         var validCommands = [
             "getScore", "addNote", "addRest", "addTuplet", "appendMeasure", "deleteSelection",
             "getCursorInfo", "goToMeasure", "nextElement", "prevElement", "nextStaff", "prevStaff",
-            "selectCurrentMeasure", "processSequence", "insertMeasure", "goToFinalMeasure",
+            "selectCurrentMeasure", "insertMeasure", "goToFinalMeasure",
             "goToBeginningOfScore", "setTimeSignature", "addLyrics", "addInstrument",    
             "setStaffMute", "setInstrumentSound", "setTempo"
         ];
 
         try {
+            var results = [];
             for (var i = 0; i < params.sequence.length; i++) {
                 var command = params.sequence[i];
                 if (!validCommands.includes(command.action)) {
                     throw new Error("Invalid command: " + command.action);
                 }
-                processCommand(command);
+                var result = processCommand(command);
+                results.push({action: command.action, result: result});
             }
-            return { success: true, message: "Sequence processed", currentSelection: selectionState };
+            return { success: true, results: results, message: "Sequence processed", currentSelection: selectionState };
         } catch (e) {
             return { error: e.toString() };
         }
@@ -951,7 +987,7 @@ MuseScore {
             
             var tempo = newElement(Element.TEMPO_TEXT);
             tempo.tempo = params.bpm / 60.0;
-            tempo.text = "♩ = " + params.bpm;
+            tempo.text = params.text || ("♩ = " + params.bpm);
             
             cursor.add(tempo);
             
@@ -965,30 +1001,38 @@ MuseScore {
 
     function getScore(params) {
         if (!curScore) return { error: "No score open" };
-        
+
         try {
-            return { success: true, analysis: getScoreSummary() };
+            return { success: true, analysis: getScoreSummary(params) };
         } catch (e) {
             return { error: e.toString() };
         }
     }
 
-    function getScoreSummary() {
+    function getScoreSummary(params) {
         if (!curScore) return { error: "No score open" };
 
         return executeWithUndo(function() {
             var tempState = selectionState;
+
+            // Parse filter params (only when called from getScore with explicit params)
+            var startMeasure = params && params.startMeasure ? params.startMeasure : 1;
+            var endMeasure = params && params.endMeasure ? params.endMeasure : curScore.nmeasures;
+            var filterStaves = params && params.staves ? params.staves : null;
+
             var score = {
                 numMeasures: curScore.nmeasures,
                 measures: [],
                 staves: []
             };
-            
+
             // Analyze staves
             for (var i = 0; i < curScore.nstaves; i++) {
-                var staff = curScore.staves && curScore.staves[i] || 
+                if (filterStaves && filterStaves.indexOf(i) === -1) continue;
+
+                var staff = curScore.staves && curScore.staves[i] ||
                            (typeof curScore.staff === "function" ? curScore.staff(i) : null);
-                
+
                 score.staves.push({
                     name: `staff${i}`,
                     shortName: staff ? staff.shortName : "",
@@ -996,30 +1040,39 @@ MuseScore {
                 });
             }
 
-            // Analyze measures
+            // Walk all measure boundaries for correct tick mapping
             var cursor = createCursor({startTick: 0});
             var measureBoundaries = [];
+            var allMeasures = [];
 
-            // Get measure boundaries
             for (var i = 0; i < curScore.nmeasures; i++) {
-                var measure = {
-                    measure: i + 1, 
-                    startTick: cursor.tick,
-                    numElements: 0, 
-                    elements: {}
-                };
+                measureBoundaries.push(cursor.tick);
 
-                for (var j = 0; j < curScore.nstaves; j++) {
-                    measure.elements[`staff${j}`] = [];
+                // Only include measures in the requested range
+                if (i + 1 >= startMeasure && i + 1 <= endMeasure) {
+                    var measure = {
+                        measure: i + 1,
+                        startTick: cursor.tick,
+                        numElements: 0,
+                        elements: {}
+                    };
+
+                    for (var j = 0; j < curScore.nstaves; j++) {
+                        if (filterStaves && filterStaves.indexOf(j) === -1) continue;
+                        measure.elements[`staff${j}`] = [];
+                    }
+
+                    allMeasures.push({index: i, measure: measure});
+                    score.measures.push(measure);
                 }
 
-                measureBoundaries.push(cursor.tick);
-                score.measures.push(measure);
                 cursor.nextMeasure();
             }
 
             // Process elements for each staff
             for (var k = 0; k < curScore.nstaves; k++) {
+                if (filterStaves && filterStaves.indexOf(k) === -1) continue;
+
                 cursor.rewind(0);
                 cursor.staffIdx = k;
 
@@ -1028,12 +1081,26 @@ MuseScore {
                         return tick <= cursor.tick;
                     }).length - 1;
 
-                    score.measures[measureIdx].numElements++;
+                    // Only process if this measure is in the requested range
+                    if (measureIdx + 1 >= startMeasure && measureIdx + 1 <= endMeasure) {
+                        // Find the corresponding measure in our filtered list
+                        var filteredIdx = -1;
+                        for (var m = 0; m < allMeasures.length; m++) {
+                            if (allMeasures[m].index === measureIdx) {
+                                filteredIdx = m;
+                                break;
+                            }
+                        }
 
-                    var processedElement = processElement(cursor.element);
-                    if (processedElement) {
-                        processedElement.startTick = cursor.tick;
-                        score.measures[measureIdx].elements[`staff${k}`].push(processedElement);
+                        if (filteredIdx >= 0) {
+                            score.measures[filteredIdx].numElements++;
+
+                            var processedElement = processElement(cursor.element);
+                            if (processedElement) {
+                                processedElement.startTick = cursor.tick;
+                                score.measures[filteredIdx].elements[`staff${k}`].push(processedElement);
+                            }
+                        }
                     }
 
                     if (!cursor.next()) break;
@@ -1051,17 +1118,24 @@ MuseScore {
     // ========================================
 
     onRun: {
-        console.log("Starting MuseScore API Server (Clean Version) on port 8765");
-        
+        if (serverRunning) {
+            console.log("MuseScore API Server is already running on port 8765");
+            return;
+        }
+
+        console.log("Starting MuseScore API Server on port 8765");
+
         api.websocketserver.listen(8765, function(clientId) {
             console.log("Client connected with ID: " + clientId);
             clientConnections.push(clientId);
-            
+
             api.websocketserver.onMessage(clientId, function(message) {
                 processMessage(message, clientId);
             });
         });
-    
+
+        serverRunning = true;
+
         if (curScore) {
             initCursorState();
         }
