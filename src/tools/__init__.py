@@ -6,12 +6,14 @@ from .notes_measures import setup_notes_measures_tools
 from .staff_instruments import setup_staff_instruments_tools
 from .time_tempo import setup_time_tempo_tools
 from .sequences import setup_sequence_tools
+from .tips import setup_tips_tools
 
 __all__ = [
     "setup_connection_tools",
-    "setup_navigation_tools", 
+    "setup_navigation_tools",
     "setup_notes_measures_tools",
     "setup_staff_instruments_tools",
     "setup_time_tempo_tools",
-    "setup_sequence_tools"
+    "setup_sequence_tools",
+    "setup_tips_tools"
 ]
