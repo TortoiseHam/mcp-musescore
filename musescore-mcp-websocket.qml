@@ -69,6 +69,10 @@ MuseScore {
             case "addRest":                 return addRest(command.params);
             case "addTuplet":               return addTuplet(command.params);
             case "addLyrics":               return addLyrics(command.params);
+            case "addCursorElement":        return addCursorElement(command.params);
+            case "addSlur":                 return addSlur();
+            case "addTie":                  return addTie();
+            case "addHairpin":              return addHairpin(command.params);
 
             // Measures
             case "appendMeasure":           return appendMeasure(command.params);
@@ -307,7 +311,8 @@ MuseScore {
             "getCursorInfo", "goToMeasure", "nextElement", "prevElement", "nextStaff", "prevStaff",
             "selectCurrentMeasure", "insertMeasure", "goToFinalMeasure",
             "goToBeginningOfScore", "setTimeSignature", "addLyrics", "addInstrument",    
-            "setStaffMute", "setInstrumentSound", "setTempo"
+            "setStaffMute", "setInstrumentSound", "setTempo",
+            "addCursorElement", "addSlur", "addTie", "addHairpin"
         ];
 
         try {
@@ -671,6 +676,79 @@ MuseScore {
     // ========================================
     // NOTE & MUSIC OPERATIONS
     // ========================================
+
+    function addCursorElement(params) {
+        if (!params || !params.elementType) {
+            return { error: "elementType is required" };
+        }
+
+        var elementType = Element[params.elementType];
+        if (elementType === undefined) {
+            return { error: "Unknown element type: " + params.elementType };
+        }
+
+        return executeWithUndo(function() {
+            syncStateToSelection();
+
+            var cursor = createCursor();
+            var elem = newElement(elementType);
+
+            if (params.properties) {
+                var keys = Object.keys(params.properties);
+                for (var i = 0; i < keys.length; i++) {
+                    elem[keys[i]] = params.properties[keys[i]];
+                }
+            }
+
+            cursor.add(elem);
+
+            return {
+                success: true,
+                message: params.elementType + " added",
+                currentSelection: selectionState
+            };
+        });
+    }
+
+    function addSlur() {
+        return executeWithUndo(function() {
+            cmd("add-slur");
+            syncStateToSelection();
+            return {
+                success: true,
+                message: "Slur added",
+                currentSelection: selectionState
+            };
+        });
+    }
+
+    function addTie() {
+        return executeWithUndo(function() {
+            cmd("tie");
+            syncStateToSelection();
+            return {
+                success: true,
+                message: "Tie added",
+                currentSelection: selectionState
+            };
+        });
+    }
+
+    function addHairpin(params) {
+        return executeWithUndo(function() {
+            if (params && params.hairpinType === "diminuendo") {
+                cmd("add-hairpin-reverse");
+            } else {
+                cmd("add-hairpin");
+            }
+            syncStateToSelection();
+            return {
+                success: true,
+                message: (params && params.hairpinType || "crescendo") + " hairpin added",
+                currentSelection: selectionState
+            };
+        });
+    }
 
     function addNote(params) {
         var validation = validateParams(params, ["pitch", "duration", "advanceCursorAfterAction"]);

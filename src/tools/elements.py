@@ -66,3 +66,77 @@ def setup_element_tools(mcp, client: MuseScoreClient):
                 result["runtime_properties"] = qml_result
 
         return result
+
+    @mcp.tool()
+    async def add_cursor_element(element_type: str, properties: Optional[dict] = None):
+        """Add an element at the current cursor position.
+
+        Use list_elements() to see available types, and describe_element() to see
+        properties for a specific type.
+
+        This works for cursor-attached elements: DYNAMIC, STAFF_TEXT, SYSTEM_TEXT,
+        REHEARSAL_MARK, FERMATA, ARTICULATION, HARMONY, FINGERING, INSTRUMENT_CHANGE,
+        KEYSIG, BAR_LINE.
+
+        Args:
+            element_type: Element type name (e.g. "DYNAMIC", "STAFF_TEXT")
+            properties: Dict of property name to value to set on the element
+                (e.g. {"text": "ff", "velocity": 96} for a dynamic)
+
+        Returns:
+            currentSelection: Updated selection state after adding the element.
+        """
+        info = get_element_info(element_type)
+        if not info:
+            all_types = []
+            for cat in get_element_categories().values():
+                all_types.extend(cat["elements"])
+            return {"error": f"Unknown element type: {element_type}. Available: {all_types}"}
+        if info.get("category") != "cursor_attached":
+            return {"error": f"{element_type} is not cursor-attached. "
+                    f"Category: {info.get('category')}. See its description for the right tool."}
+        params = {"elementType": element_type}
+        if properties:
+            params["properties"] = properties
+        return await client.send_command("addCursorElement", params)
+
+    @mcp.tool()
+    async def add_slur():
+        """Add a slur starting from the current selection.
+
+        The slur begins at the currently selected note. After calling this,
+        use next_element() to extend the slur, then call any note/navigation
+        tool to finalize it.
+
+        Returns:
+            currentSelection: Updated selection state.
+        """
+        return await client.send_command("addSlur")
+
+    @mcp.tool()
+    async def add_tie():
+        """Add a tie from the currently selected note to the next note of the same pitch.
+
+        The note must be selected before calling this.
+
+        Returns:
+            currentSelection: Updated selection state.
+        """
+        return await client.send_command("addTie")
+
+    @mcp.tool()
+    async def add_hairpin(hairpin_type: str = "crescendo"):
+        """Add a crescendo or diminuendo hairpin at the current selection.
+
+        Select a range first (e.g. via select_current_measure or select_custom_range),
+        then call this to add the hairpin across that range.
+
+        Args:
+            hairpin_type: "crescendo" or "diminuendo"
+
+        Returns:
+            currentSelection: Updated selection state.
+        """
+        if hairpin_type not in ("crescendo", "diminuendo"):
+            return {"error": "hairpin_type must be 'crescendo' or 'diminuendo'"}
+        return await client.send_command("addHairpin", {"hairpinType": hairpin_type})

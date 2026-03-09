@@ -1,169 +1,246 @@
 """TypedDict definitions for MuseScore MCP action sequences."""
 
-from typing import Dict, Any, List, Literal, TypedDict
+from typing import Dict, Any, List, Literal, Optional
+from typing_extensions import TypedDict, NotRequired
 
 
-class getScoreAction(TypedDict):
+class GetScoreParams(TypedDict, total=False):
+    startMeasure: int
+    endMeasure: int
+    staves: List[int]
+
+
+class GetScoreAction(TypedDict):
     action: Literal["getScore"]
-    params: Dict[str, Any]
+    params: GetScoreParams
 
 
-class addNoteParams(TypedDict):
+class AddNoteParams(TypedDict):
     pitch: int
     duration: Dict[Literal["numerator", "denominator"], int]
     advanceCursorAfterAction: bool
 
 
-class addNoteAction(TypedDict):
+class AddNoteAction(TypedDict):
     action: Literal["addNote"]
-    params: addNoteParams
+    params: AddNoteParams
 
 
-class addRestParams(TypedDict):
+class AddRestParams(TypedDict):
     duration: Dict[Literal["numerator", "denominator"], int]
     advanceCursorAfterAction: bool
 
 
-class addRestAction(TypedDict):
+class AddRestAction(TypedDict):
     action: Literal["addRest"]
-    params: addRestParams
+    params: AddRestParams
 
 
-class addTupletParams(TypedDict):
+class AddTupletParams(TypedDict):
     duration: Dict[Literal["numerator", "denominator"], int]
     ratio: Dict[Literal["numerator", "denominator"], int]
     advanceCursorAfterAction: bool
 
 
-class addTupletAction(TypedDict):
+class AddTupletAction(TypedDict):
     action: Literal["addTuplet"]
-    params: addTupletParams
+    params: AddTupletParams
 
 
-class addLyricsParams(TypedDict):
+class AddLyricsParams(TypedDict):
     lyrics: List[str]
     verse: int
 
 
-class addLyricsAction(TypedDict):
+class AddLyricsAction(TypedDict):
     action: Literal["addLyrics"]
-    params: addLyricsParams
+    params: AddLyricsParams
 
 
-class addInstrumentParams(TypedDict):
+class AddInstrumentParams(TypedDict):
     instrumentId: str
 
 
-class addInstrumentAction(TypedDict):
+class AddInstrumentAction(TypedDict):
     action: Literal["addInstrument"]
-    params: addInstrumentParams
+    params: AddInstrumentParams
 
 
-class setStaffMuteParams(TypedDict):
+class SetStaffMuteParams(TypedDict):
     staff: int
     mute: bool
 
 
-class setStaffMuteAction(TypedDict):
+class SetStaffMuteAction(TypedDict):
     action: Literal["setStaffMute"]
-    params: setStaffMuteParams
+    params: SetStaffMuteParams
 
 
-class setInstrumentSoundParams(TypedDict):
+class SetInstrumentSoundParams(TypedDict):
     staff: int
     instrumentId: str
 
 
-class setInstrumentSoundAction(TypedDict):
+class SetInstrumentSoundAction(TypedDict):
     action: Literal["setInstrumentSound"]
-    params: setInstrumentSoundParams
+    params: SetInstrumentSoundParams
 
 
-class appendMeasureAction(TypedDict):
+class AppendMeasureAction(TypedDict):
     action: Literal["appendMeasure"]
     params: Dict[str, Any]
 
 
-class deleteSelectionAction(TypedDict):
+class DeleteSelectionAction(TypedDict):
     action: Literal["deleteSelection"]
     params: Dict[str, Any]
 
 
-class getCursorInfoAction(TypedDict):
+class GetCursorInfoParams(TypedDict, total=False):
+    verbose: str
+
+
+class GetCursorInfoAction(TypedDict):
     action: Literal["getCursorInfo"]
-    params: Dict[str, Any]
+    params: GetCursorInfoParams
 
 
-class goToMeasureParams(TypedDict):
+class GoToMeasureParams(TypedDict):
     measure: int
 
 
-class goToMeasureAction(TypedDict):
+class GoToMeasureAction(TypedDict):
     action: Literal["goToMeasure"]
-    params: goToMeasureParams
+    params: GoToMeasureParams
 
 
-class nextElementAction(TypedDict):
+class NextElementParams(TypedDict, total=False):
+    numElements: int
+
+
+class NextElementAction(TypedDict):
     action: Literal["nextElement"]
-    params: Dict[str, Any]
+    params: NextElementParams
 
 
-class prevElementAction(TypedDict):
+class PrevElementParams(TypedDict, total=False):
+    numElements: int
+
+
+class PrevElementAction(TypedDict):
     action: Literal["prevElement"]
-    params: Dict[str, Any]
+    params: PrevElementParams
 
 
-class selectCurrentMeasureAction(TypedDict):
+class SelectCurrentMeasureAction(TypedDict):
     action: Literal["selectCurrentMeasure"]
     params: Dict[str, Any]
 
 
-class insertMeasureAction(TypedDict):
+class InsertMeasureAction(TypedDict):
     action: Literal["insertMeasure"]
     params: Dict[str, Any]
 
 
-class goToFinalMeasureAction(TypedDict):
+class GoToFinalMeasureAction(TypedDict):
     action: Literal["goToFinalMeasure"]
     params: Dict[str, Any]
 
 
-class goToBeginningOfScoreAction(TypedDict):
+class GoToBeginningOfScoreAction(TypedDict):
     action: Literal["goToBeginningOfScore"]
     params: Dict[str, Any]
 
 
-class setTimeSignatureParams(TypedDict):
+class SetTimeSignatureParams(TypedDict):
     numerator: int
     denominator: int
 
 
-class setTimeSignatureAction(TypedDict):
+class SetTimeSignatureAction(TypedDict):
     action: Literal["setTimeSignature"]
-    params: setTimeSignatureParams
+    params: SetTimeSignatureParams
 
 
-class undoAction(TypedDict):
+class UndoAction(TypedDict):
     action: Literal["undo"]
     params: Dict[str, Any]
 
 
-class nextStaffAction(TypedDict):
+class NextStaffAction(TypedDict):
     action: Literal["nextStaff"]
     params: Dict[str, Any]
 
 
-class prevStaffAction(TypedDict):
+class PrevStaffAction(TypedDict):
     action: Literal["prevStaff"]
     params: Dict[str, Any]
 
 
+class SetTempoParams(TypedDict):
+    bpm: float
+    text: NotRequired[str]
+
+
+class SetTempoAction(TypedDict):
+    action: Literal["setTempo"]
+    params: SetTempoParams
+
+
+class SelectCustomRangeParams(TypedDict):
+    startTick: int
+    endTick: int
+    startStaff: int
+    endStaff: int
+
+
+class SelectCustomRangeAction(TypedDict):
+    action: Literal["selectCustomRange"]
+    params: SelectCustomRangeParams
+
+
+class SyncStateToSelectionAction(TypedDict):
+    action: Literal["syncStateToSelection"]
+    params: Dict[str, Any]
+
+
+class AddCursorElementParams(TypedDict):
+    elementType: str
+    properties: NotRequired[Dict[str, Any]]
+
+
+class AddCursorElementAction(TypedDict):
+    action: Literal["addCursorElement"]
+    params: AddCursorElementParams
+
+
+class AddSlurAction(TypedDict):
+    action: Literal["addSlur"]
+    params: Dict[str, Any]
+
+
+class AddTieAction(TypedDict):
+    action: Literal["addTie"]
+    params: Dict[str, Any]
+
+
+class AddHairpinParams(TypedDict):
+    hairpinType: str
+
+
+class AddHairpinAction(TypedDict):
+    action: Literal["addHairpin"]
+    params: AddHairpinParams
+
+
 ActionSequence = List[
-    getScoreAction | addNoteAction | addRestAction | addTupletAction | 
-    addLyricsAction | addInstrumentAction | setStaffMuteAction | 
-    setInstrumentSoundAction | appendMeasureAction | deleteSelectionAction | 
-    getCursorInfoAction | goToMeasureAction | nextElementAction | 
-    prevElementAction | selectCurrentMeasureAction | insertMeasureAction | 
-    goToFinalMeasureAction | goToBeginningOfScoreAction | setTimeSignatureAction | 
-    undoAction | nextStaffAction | prevStaffAction
+    GetScoreAction | AddNoteAction | AddRestAction | AddTupletAction |
+    AddLyricsAction | AddInstrumentAction | SetStaffMuteAction |
+    SetInstrumentSoundAction | AppendMeasureAction | DeleteSelectionAction |
+    GetCursorInfoAction | GoToMeasureAction | NextElementAction |
+    PrevElementAction | SelectCurrentMeasureAction | InsertMeasureAction |
+    GoToFinalMeasureAction | GoToBeginningOfScoreAction | SetTimeSignatureAction |
+    UndoAction | NextStaffAction | PrevStaffAction | SetTempoAction |
+    SelectCustomRangeAction | SyncStateToSelectionAction |
+    AddCursorElementAction | AddSlurAction | AddTieAction | AddHairpinAction
 ]
