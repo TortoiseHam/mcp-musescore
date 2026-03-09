@@ -1,5 +1,6 @@
 """Connection and utility tools for MuseScore MCP."""
 
+import os
 from typing import List, Optional
 from ..client import MuseScoreClient
 
@@ -74,7 +75,6 @@ def setup_connection_tools(mcp, client: MuseScoreClient):
             success: Whether the export succeeded
             path: The absolute path to the exported PDF file
         """
-        import os
         parent = os.path.dirname(output_path)
         if parent:
             os.makedirs(parent, exist_ok=True)

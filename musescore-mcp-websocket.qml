@@ -107,6 +107,25 @@ MuseScore {
         return missing.length > 0 ? { error: "Missing required parameters: " + missing.join(", ") } : { valid: true };
     }
 
+    function resolveElementType(params) {
+        if (!params || !params.elementType) {
+            return { error: "elementType is required" };
+        }
+        var elementType = Element[params.elementType];
+        if (elementType === undefined) {
+            return { error: "Unknown element type: " + params.elementType };
+        }
+        return { type: elementType };
+    }
+
+    function addCmdElement(cmdName, label) {
+        return executeWithUndo(function() {
+            cmd(cmdName);
+            syncStateToSelection();
+            return { success: true, message: label + " added", currentSelection: selectionState };
+        });
+    }
+
     function executeWithUndo(operation) {
         if (!curScore) return { error: "No score open" };
         
@@ -261,17 +280,11 @@ MuseScore {
     }
 
     function describeElement(params) {
-        if (!params || !params.elementType) {
-            return { error: "elementType is required" };
-        }
-
-        var elementType = Element[params.elementType];
-        if (elementType === undefined) {
-            return { error: "Unknown element type: " + params.elementType };
-        }
+        var resolved = resolveElementType(params);
+        if (resolved.error) return resolved;
 
         try {
-            var elem = newElement(elementType);
+            var elem = newElement(resolved.type);
             var properties = {};
 
             Object.keys(elem).forEach(function(key) {
@@ -747,20 +760,12 @@ MuseScore {
     // ========================================
 
     function addCursorElement(params) {
-        if (!params || !params.elementType) {
-            return { error: "elementType is required" };
-        }
-
-        var elementType = Element[params.elementType];
-        if (elementType === undefined) {
-            return { error: "Unknown element type: " + params.elementType };
-        }
+        var resolved = resolveElementType(params);
+        if (resolved.error) return resolved;
 
         return executeWithUndo(function() {
-            syncStateToSelection();
-
             var cursor = createCursor();
-            var elem = newElement(elementType);
+            var elem = newElement(resolved.type);
 
             if (params.properties) {
                 var keys = Object.keys(params.properties);
@@ -781,43 +786,17 @@ MuseScore {
     }
 
     function addSlur() {
-        return executeWithUndo(function() {
-            cmd("add-slur");
-            syncStateToSelection();
-            return {
-                success: true,
-                message: "Slur added",
-                currentSelection: selectionState
-            };
-        });
+        return addCmdElement("add-slur", "Slur");
     }
 
     function addTie() {
-        return executeWithUndo(function() {
-            cmd("tie");
-            syncStateToSelection();
-            return {
-                success: true,
-                message: "Tie added",
-                currentSelection: selectionState
-            };
-        });
+        return addCmdElement("tie", "Tie");
     }
 
     function addHairpin(params) {
-        return executeWithUndo(function() {
-            if (params && params.hairpinType === "diminuendo") {
-                cmd("add-hairpin-reverse");
-            } else {
-                cmd("add-hairpin");
-            }
-            syncStateToSelection();
-            return {
-                success: true,
-                message: (params && params.hairpinType || "crescendo") + " hairpin added",
-                currentSelection: selectionState
-            };
-        });
+        var cmdName = (params && params.hairpinType === "diminuendo") ? "add-hairpin-reverse" : "add-hairpin";
+        var label = (params && params.hairpinType || "crescendo") + " hairpin";
+        return addCmdElement(cmdName, label);
     }
 
     function addNote(params) {
@@ -1191,7 +1170,6 @@ MuseScore {
             // Walk all measure boundaries for correct tick mapping
             var cursor = createCursor({startTick: 0});
             var measureBoundaries = [];
-            var allMeasures = [];
 
             for (var i = 0; i < curScore.nmeasures; i++) {
                 measureBoundaries.push(cursor.tick);
@@ -1210,7 +1188,6 @@ MuseScore {
                         measure.elements[`staff${j}`] = [];
                     }
 
-                    allMeasures.push({index: i, measure: measure});
                     score.measures.push(measure);
                 }
 
@@ -1231,23 +1208,14 @@ MuseScore {
 
                     // Only process if this measure is in the requested range
                     if (measureIdx + 1 >= startMeasure && measureIdx + 1 <= endMeasure) {
-                        // Find the corresponding measure in our filtered list
-                        var filteredIdx = -1;
-                        for (var m = 0; m < allMeasures.length; m++) {
-                            if (allMeasures[m].index === measureIdx) {
-                                filteredIdx = m;
-                                break;
-                            }
-                        }
+                        var filteredIdx = measureIdx - (startMeasure - 1);
 
-                        if (filteredIdx >= 0) {
-                            score.measures[filteredIdx].numElements++;
+                        score.measures[filteredIdx].numElements++;
 
-                            var processedElement = processElement(cursor.element);
-                            if (processedElement) {
-                                processedElement.startTick = cursor.tick;
-                                score.measures[filteredIdx].elements[`staff${k}`].push(processedElement);
-                            }
+                        var processedElement = processElement(cursor.element);
+                        if (processedElement) {
+                            processedElement.startTick = cursor.tick;
+                            score.measures[filteredIdx].elements[`staff${k}`].push(processedElement);
                         }
                     }
 

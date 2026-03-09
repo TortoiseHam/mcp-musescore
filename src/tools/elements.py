@@ -2,7 +2,7 @@
 
 from typing import Optional
 from ..client import MuseScoreClient
-from ..registry import get_element_categories, get_elements_in_category, get_element_info
+from ..registry import get_element_categories, get_element_info, get_all_element_types
 
 
 def setup_element_tools(mcp, client: MuseScoreClient):
@@ -50,10 +50,7 @@ def setup_element_tools(mcp, client: MuseScoreClient):
         """
         info = get_element_info(element_type)
         if not info:
-            all_types = []
-            for cat in get_element_categories().values():
-                all_types.extend(cat["elements"])
-            return {"error": f"Unknown element type: {element_type}. Available: {all_types}"}
+            return {"error": f"Unknown element type: {element_type}. Available: {get_all_element_types()}"}
 
         result = dict(info)
         result["type"] = element_type
@@ -88,10 +85,7 @@ def setup_element_tools(mcp, client: MuseScoreClient):
         """
         info = get_element_info(element_type)
         if not info:
-            all_types = []
-            for cat in get_element_categories().values():
-                all_types.extend(cat["elements"])
-            return {"error": f"Unknown element type: {element_type}. Available: {all_types}"}
+            return {"error": f"Unknown element type: {element_type}. Available: {get_all_element_types()}"}
         if info.get("category") != "cursor_attached":
             return {"error": f"{element_type} is not cursor-attached. "
                     f"Category: {info.get('category')}. See its description for the right tool."}

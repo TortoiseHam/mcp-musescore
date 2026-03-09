@@ -163,6 +163,14 @@ def get_elements_in_category(category: str) -> List[str]:
     return cat["elements"]
 
 
+def get_all_element_types() -> List[str]:
+    """Return all element type names across all categories."""
+    types = []
+    for cat in ELEMENT_CATEGORIES.values():
+        types.extend(cat["elements"])
+    return types
+
+
 def get_element_info(element_type: str) -> Dict[str, Any]:
     """Return info about a specific element type."""
     return ELEMENT_INFO.get(element_type, {})
