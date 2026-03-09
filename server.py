@@ -11,7 +11,8 @@ from src.tools import (
     setup_staff_instruments_tools,
     setup_time_tempo_tools,
     setup_sequence_tools,
-    setup_tips_tools
+    setup_tips_tools,
+    setup_element_tools
 )
 
 # Set up logging
@@ -34,6 +35,7 @@ setup_staff_instruments_tools(mcp, client)
 setup_time_tempo_tools(mcp, client)
 setup_sequence_tools(mcp, client)
 setup_tips_tools(mcp)
+setup_element_tools(mcp, client)
 
 # Main entry point
 if __name__ == "__main__":
