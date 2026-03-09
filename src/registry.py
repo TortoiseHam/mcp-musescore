@@ -155,14 +155,6 @@ def get_element_categories() -> Dict[str, Any]:
     return ELEMENT_CATEGORIES
 
 
-def get_elements_in_category(category: str) -> List[str]:
-    """Return element type names in a category."""
-    cat = ELEMENT_CATEGORIES.get(category)
-    if not cat:
-        return []
-    return cat["elements"]
-
-
 def get_all_element_types() -> List[str]:
     """Return all element type names across all categories."""
     types = []

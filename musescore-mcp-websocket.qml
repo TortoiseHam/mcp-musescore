@@ -764,6 +764,7 @@ MuseScore {
         if (resolved.error) return resolved;
 
         return executeWithUndo(function() {
+            syncStateToSelection();
             var cursor = createCursor();
             var elem = newElement(resolved.type);
 
