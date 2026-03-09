@@ -38,4 +38,6 @@ __all__ = [
     "AddSlurAction",
     "AddTieAction",
     "AddHairpinAction",
+    "ExportPdfAction",
+    "SetVoiceAction",
 ]

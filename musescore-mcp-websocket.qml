@@ -48,6 +48,7 @@ MuseScore {
             case "ping":                    return "pong";
             case "undo":                    return undo();
             case "describeElement":         return describeElement(command.params);
+            case "exportPdf":               return exportPdf(command.params);
             case "goToBeginningOfScore":    return goToBeginningOfScore();
             case "processSequence":         return processSequence(command.params);
 
@@ -59,6 +60,7 @@ MuseScore {
             case "prevElement":             return prevElement(command.params);
             case "nextStaff":               return nextStaff(command.params);
             case "prevStaff":               return prevStaff(command.params);
+            case "setVoice":                return setVoice(command.params);
 
             // Selection
             case "selectCurrentMeasure":    return selectCurrentMeasure(command.params);
@@ -292,6 +294,23 @@ MuseScore {
         }
     }
 
+    function exportPdf(params) {
+        if (!curScore) return { error: "No score open" };
+
+        var outputPath = params && params.outputPath || "/tmp/musescore-mcp/export.pdf";
+
+        try {
+            var success = writeScore(curScore, outputPath, "pdf");
+            if (success) {
+                return { success: true, path: outputPath, message: "Score exported to PDF" };
+            } else {
+                return { success: false, error: "writeScore returned false — check path and permissions" };
+            }
+        } catch (e) {
+            return { error: e.toString() };
+        }
+    }
+
     function goToBeginningOfScore() {
         var response = initCursorState();
         return { 
@@ -312,7 +331,8 @@ MuseScore {
             "selectCurrentMeasure", "insertMeasure", "goToFinalMeasure",
             "goToBeginningOfScore", "setTimeSignature", "addLyrics", "addInstrument",    
             "setStaffMute", "setInstrumentSound", "setTempo",
-            "addCursorElement", "addSlur", "addTie", "addHairpin"
+            "addCursorElement", "addSlur", "addTie", "addHairpin",
+            "setVoice"
         ];
 
         try {
@@ -563,6 +583,55 @@ MuseScore {
             };
 
             return { success: true, currentSelection: selectionState };
+        });
+    }
+
+    function setVoice(params) {
+        var validation = validateParams(params, ["voice"]);
+        if (!validation.valid) return validation;
+
+        var voice = params.voice;
+        if (voice < 0 || voice > 3) {
+            return { error: "Voice must be 0-3" };
+        }
+
+        return executeWithUndo(function() {
+            syncStateToSelection();
+
+            var staffIdx = selectionState.startStaff;
+            var cursor = createCursor({
+                startTick: selectionState.startTick,
+                startStaff: staffIdx
+            });
+
+            cursor.track = staffIdx * 4 + voice;
+            cursor.rewindToTick(selectionState.startTick);
+
+            var element = processElement(cursor.element);
+            var startTick = cursor.tick;
+
+            curScore.selection.clear();
+            curScore.selection.selectRange(
+                startTick,
+                startTick + (element ? element.durationTicks : 0),
+                staffIdx,
+                staffIdx + 1
+            );
+
+            selectionState = {
+                startStaff: staffIdx,
+                endStaff: staffIdx + 1,
+                startTick: startTick,
+                voice: voice,
+                elements: element ? [element] : [],
+                totalDuration: element ? element.durationTicks : 0
+            };
+
+            return {
+                success: true,
+                message: "Voice set to " + voice,
+                currentSelection: selectionState
+            };
         });
     }
 

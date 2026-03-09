@@ -233,6 +233,24 @@ class AddHairpinAction(TypedDict):
     params: AddHairpinParams
 
 
+class ExportPdfParams(TypedDict, total=False):
+    outputPath: str
+
+
+class ExportPdfAction(TypedDict):
+    action: Literal["exportPdf"]
+    params: ExportPdfParams
+
+
+class SetVoiceParams(TypedDict):
+    voice: int
+
+
+class SetVoiceAction(TypedDict):
+    action: Literal["setVoice"]
+    params: SetVoiceParams
+
+
 ActionSequence = List[
     GetScoreAction | AddNoteAction | AddRestAction | AddTupletAction |
     AddLyricsAction | AddInstrumentAction | SetStaffMuteAction |
@@ -242,5 +260,6 @@ ActionSequence = List[
     GoToFinalMeasureAction | GoToBeginningOfScoreAction | SetTimeSignatureAction |
     UndoAction | NextStaffAction | PrevStaffAction | SetTempoAction |
     SelectCustomRangeAction | SyncStateToSelectionAction |
-    AddCursorElementAction | AddSlurAction | AddTieAction | AddHairpinAction
+    AddCursorElementAction | AddSlurAction | AddTieAction | AddHairpinAction |
+    ExportPdfAction | SetVoiceAction
 ]
