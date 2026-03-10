@@ -1,5 +1,7 @@
 """Transcription tips and workflow advice for MuseScore MCP."""
 
+from mcp.server.fastmcp import FastMCP
+
 
 TRANSCRIPTION_TIPS = """
 # PDF-to-MuseScore Transcription Guide
@@ -92,7 +94,7 @@ If the score has vocal parts with lyrics:
 """.strip()
 
 
-def setup_tips_tools(mcp):
+def setup_tips_tools(mcp: FastMCP) -> None:
     """Setup transcription tips tools."""
 
     @mcp.tool()
