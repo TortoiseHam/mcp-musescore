@@ -98,6 +98,30 @@ def setup_element_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
         return await client.send_command("addCursorElement", params)
 
     @mcp.tool()
+    async def add_volta(text: str, endings: list[int], start_measure: int, end_measure: int):
+        """Add a volta bracket (repeat ending) spanning a measure range.
+
+        Args:
+            text: Display text for the volta (e.g. "1.", "2.", "1.-3.")
+            endings: List of ending numbers this volta covers (e.g. [1], [2], [1, 2, 3])
+            start_measure: First measure of the volta (1-based)
+            end_measure: Last measure of the volta (1-based)
+
+        Returns:
+            Result with volta placement status
+        """
+        if start_measure < 1 or end_measure < 1:
+            return {"error": "Measures must be >= 1"}
+        if end_measure < start_measure:
+            return {"error": "end_measure must be >= start_measure"}
+        return await client.send_command("addVolta", {
+            "text": text,
+            "endings": endings,
+            "startMeasure": start_measure,
+            "endMeasure": end_measure,
+        })
+
+    @mcp.tool()
     async def add_slur():
         """Add a slur starting from the current selection.
 

@@ -38,23 +38,46 @@ Walk through the PDF and mark up the structural elements that define the road ma
 2. **Time signature changes** — If the meter changes mid-piece, place those with `set_time_signature()`.
 3. **Tempo changes** — Use `set_tempo()` at each tempo change. Use the `text` parameter for markings like "Allegro", "rit.", etc.
 4. **Rehearsal marks** — Place with `add_cursor_element("REHEARSAL_MARK", {"text": "A"})`.
-5. **Repeat barlines & endings** — Use `add_cursor_element("BAR_LINE", {"subtypeName": "start-repeat"})` for repeat signs. Available subtypes: normal, double, start-repeat, end-repeat, end-start-repeat, end. Voltas, D.C., D.S., coda, and segno markings may need manual placement in MuseScore. Getting repeats right early prevents measure-numbering confusion later.
+5. **Repeat barlines & endings** — Use `add_cursor_element("BAR_LINE", {"subtypeName": "start-repeat"})` for repeat signs. Available subtypes: normal, double, start-repeat, end-repeat, end-start-repeat, end. For volta brackets (1st/2nd endings), use `add_volta(text="1.", endings=[1], start_measure=5, end_measure=8)`. D.C., D.S., coda, and segno markings may need manual placement in MuseScore. Getting repeats right early prevents measure-numbering confusion later.
 6. **Double barlines and final barlines** — Use `add_cursor_element("BAR_LINE", {"subtypeName": "double"})` or `"end"` for the final barline.
 
 ## Phase 3: Notes & Rhythms
 
 Now fill in the actual musical content. **Work in short sections (8-16 measures) across all staves, not one staff through the entire piece.** This keeps your working context small, makes verification possible, and lets you check that the vertical harmony between parts makes sense.
 
+### Preferred: Bulk notation with `add_notes_from_string()`
+
+The fastest way to enter notes is with the compact notation string format:
+
+```
+add_notes_from_string("r/4 Eb5/4 F5/4 G5/4 | Ab5/1 | R*7", staff=0, measure=1)
+```
+
+**Notation format:**
+- Notes: `Eb5/4` (pitch/duration), `F#4/8` (eighth note)
+- Dotted: `Eb5/4.` (dotted quarter), `C5/2..` (double-dotted half)
+- Rests: `r/4` (quarter rest), `r/1` (whole rest)
+- Ties: `Eb5/4~` (tie to next note of same pitch)
+- Multi-measure rest: `R*3` (3 measures of whole rests)
+- Barlines: `|` (visual separator, ignored by parser)
+- Common durations: /1=whole, /2=half, /4=quarter, /8=eighth, /16=sixteenth
+
+For empty measures, use `add_whole_rests(count)` to quickly fill them.
+
+### Note names instead of MIDI numbers
+
+All pitch parameters accept note name strings: `"C4"` (middle C), `"Eb5"`, `"F#4"`, `"Bb3"`. This works in `add_note()`, `add_notes_from_string()`, and `processSequence`.
+
 ### Section-by-section workflow:
 
 For each section (e.g., measures 1-8, then 9-16, etc.):
 
-1. **Enter notes for all staves in this section** — Use `go_to_measure()` to navigate to the start, then `next_staff()`/`prev_staff()` to switch between staves. For each measure, add notes and rests in order using `add_note()` and `add_rest()`. Complete all staves for this section before moving on.
+1. **Enter notes for all staves in this section** — Use `add_notes_from_string()` with `staff` and `measure` params to enter a full measure or two at a time. For individual notes, `add_note(pitch="Eb5")` also works. Complete all staves for this section before moving on.
 2. **Tuplets** — Use `add_tuplet()` when you encounter triplets or other irregular groupings.
-3. **Ties** — Use `add_tie()` when a note is tied to the next note of the same pitch. Place the tie immediately after adding the first note.
+3. **Ties** — Use `add_tie()` when a note is tied to the next note of the same pitch, or use the `~` suffix in notation strings.
 4. **Multiple voices** — For polyphonic passages on a single staff (e.g., soprano + alto on one treble staff), use `set_voice()` to switch between voices 0-3. Enter all of voice 0 for the section first, then go back and enter voice 1, etc.
-5. **Use `processSequence` for efficiency, but keep batches small** — Batch 1-2 measures at a time. Larger batches are faster but if there's an error, you have to undo the entire batch and redo it. The sweet spot is batching enough to be efficient but small enough that mistakes are cheap to fix.
-6. **Verification gate** — After completing each section, STOP and verify against the PDF before moving to the next section. Use `get_score(start_measure, end_measure)` to check just the section you entered — this is faster than fetching the entire score. Use `get_cursor_info()` to confirm the element at the current position. Do not proceed until the section is correct. Errors that accumulate over 50+ measures become nearly impossible to untangle.
+5. **Use `processSequence` for efficiency, but keep batches small** — Batch 1-2 measures at a time. `add_notes_from_string()` handles this automatically. The sweet spot is batching enough to be efficient but small enough that mistakes are cheap to fix.
+6. **Verification gate** — After completing each section, STOP and verify against the PDF before moving to the next section. Use `get_score_text(start_measure, end_measure)` for a quick human-readable check — this shows notes in the same format you entered them. Use `get_score()` for detailed JSON if needed. Do not proceed until the section is correct.
 
 ### Exploiting repetition:
 
@@ -91,11 +114,11 @@ If the score has vocal parts with lyrics:
 ## General Tips
 
 - **Use `undo()` liberally** — If something goes wrong, undo and try again. It's cheap and reliable.
-- **Octave awareness** — MIDI pitches: Middle C = 60. Each octave is 12 semitones. Double-check that notes are in the right octave — off-by-an-octave errors are the most common transcription mistake.
+- **Octave awareness** — Use note names like `"C4"` (middle C) instead of MIDI numbers to reduce octave errors. If using MIDI: Middle C = 60, each octave = 12 semitones.
 - **Read ahead in the PDF** — Before transcribing a section, scan it for repeats, key changes, or meter changes that affect how you set up the measures.
 - **Enharmonic spellings** — MuseScore may spell a note differently than the PDF (e.g., F# vs Gb). Note these for later correction.
-- **Transposing instruments** — If the PDF shows a transposing part (e.g., Bb Clarinet, F Horn), decide whether to enter concert pitch or written pitch based on how MuseScore is configured.
-- **Use `get_score` to orient yourself** — Pass `start_measure` and `end_measure` to inspect just the section you care about. Use `staves` to filter to specific instruments. This is much faster than fetching the entire score.
+- **Transposing instruments** — If the PDF shows a transposing part (e.g., Bb Clarinet, F Horn), use `written_pitch=True` in `add_notes_from_string()` and `get_score_text()` to work in written pitch. The tools will automatically convert using the instrument's transposition info from the score.
+- **Use `get_score_text()` for quick verification** — Returns human-readable notation like `m1 staff0: Eb5/4 F5/4 G5/4 Ab5/4`. Much easier to compare against a PDF than raw JSON. Use `get_score()` when you need detailed element data.
 - **Use `get_cursor_info(verbose=False)` for quick checks** — When you just need to know what's at the current position without a full score summary, set verbose to False for a faster response.
 - **Discover element capabilities** — Use `list_elements()` to see what element types are available, and `describe_element(type, runtime_properties=True)` to see all settable properties for a type.
 - **Don't fight momentum** — If a particular passage is proving difficult, mark it and move on. Come back to hard spots after the easy sections are done. Getting 90% of the score entered correctly is better than getting stuck on measure 12.

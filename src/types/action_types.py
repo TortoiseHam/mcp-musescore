@@ -15,7 +15,7 @@ class GetScoreAction(TypedDict):
 
 
 class AddNoteParams(TypedDict):
-    pitch: int
+    pitch: int | str
     duration: dict[Literal["numerator", "denominator"], int]
     advanceCursorAfterAction: bool
 
@@ -250,6 +250,18 @@ class SetVoiceAction(TypedDict):
     params: SetVoiceParams
 
 
+class AddVoltaParams(TypedDict):
+    text: str
+    endings: list[int]
+    startMeasure: int
+    endMeasure: int
+
+
+class AddVoltaAction(TypedDict):
+    action: Literal["addVolta"]
+    params: AddVoltaParams
+
+
 ActionSequence = list[
     GetScoreAction | AddNoteAction | AddRestAction | AddTupletAction |
     AddLyricsAction | AddInstrumentAction | SetStaffMuteAction |
@@ -260,5 +272,5 @@ ActionSequence = list[
     UndoAction | NextStaffAction | PrevStaffAction | SetTempoAction |
     SelectCustomRangeAction | SyncStateToSelectionAction |
     AddCursorElementAction | AddSlurAction | AddTieAction | AddHairpinAction |
-    ExportPdfAction | SetVoiceAction
+    ExportPdfAction | SetVoiceAction | AddVoltaAction
 ]

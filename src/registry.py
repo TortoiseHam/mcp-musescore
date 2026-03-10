@@ -15,7 +15,7 @@ ELEMENT_CATEGORIES = {
     "cmd_shortcut": {
         "description": "Elements added via MuseScore's built-in commands. "
                        "Use dedicated tools: add_slur(), add_tie(), add_hairpin().",
-        "elements": ["SLUR", "TIE", "HAIRPIN"],
+        "elements": ["SLUR", "TIE", "HAIRPIN", "VOLTA"],
     },
 }
 
@@ -146,6 +146,18 @@ ELEMENT_INFO: dict[str, dict[str, Any]] = {
             "hairpin_type": "string — 'crescendo' or 'diminuendo'",
         },
         "example": {},
+    },
+    "VOLTA": {
+        "description": "Volta bracket (repeat ending). "
+                       "Use add_volta(text, endings, start_measure, end_measure).",
+        "category": "cmd_shortcut",
+        "common_properties": {
+            "text": "string — display text, e.g. '1.', '2.'",
+            "endings": "list[int] — ending numbers, e.g. [1], [2]",
+            "start_measure": "int — first measure (1-based)",
+            "end_measure": "int — last measure (1-based)",
+        },
+        "example": {"text": "1.", "endings": [1], "start_measure": 1, "end_measure": 4},
     },
 }
 

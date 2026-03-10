@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__musescore__ping_musescore",
+      "WebSearch",
+      "WebFetch(domain:musescore.org)",
+      "WebFetch(domain:musescore.github.io)",
+      "WebFetch(domain:github.com)",
+      "Bash(git:*)",
+      "Bash(timeout 3 uv run:*)",
+      "Bash(uv run:*)",
+      "Bash(uv sync --group dev)"
+    ]
+  }
+}

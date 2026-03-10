@@ -44,4 +44,6 @@ __all__ = [
     "ExportPdfParams",
     "SetVoiceAction",
     "SetVoiceParams",
+    "AddVoltaAction",
+    "AddVoltaParams",
 ]

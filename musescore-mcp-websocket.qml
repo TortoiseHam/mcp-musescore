@@ -49,6 +49,7 @@ MuseScore {
             case "undo":                    return undo();
             case "describeElement":         return describeElement(command.params);
             case "exportPdf":               return exportPdf(command.params);
+            case "saveScore":               return saveScore();
             case "goToBeginningOfScore":    return goToBeginningOfScore();
             case "processSequence":         return processSequence(command.params);
 
@@ -75,6 +76,7 @@ MuseScore {
             case "addSlur":                 return addSlur();
             case "addTie":                  return addTie();
             case "addHairpin":              return addHairpin(command.params);
+            case "addVolta":                return addVolta(command.params);
 
             // Measures
             case "appendMeasure":           return appendMeasure(command.params);
@@ -119,11 +121,11 @@ MuseScore {
     }
 
     function addCmdElement(cmdName, label) {
-        return executeWithUndo(function() {
-            cmd(cmdName);
-            syncStateToSelection();
-            return { success: true, message: label + " added", currentSelection: selectionState };
-        });
+        if (!curScore) return { error: "No score open" };
+        // Don't wrap cmd() in startCmd/endCmd — cmd() manages its own undo
+        cmd(cmdName);
+        syncStateToSelection();
+        return { success: true, message: label + " added", currentSelection: selectionState };
     }
 
     function executeWithUndo(operation) {
@@ -142,7 +144,7 @@ MuseScore {
 
     function getNoteName(note) {
         const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-        return noteNames[note % 12];
+        return noteNames[note % 12] + (Math.floor(note / 12) - 1);
     }
 
     function getDurationName(duration) {
@@ -324,6 +326,17 @@ MuseScore {
         }
     }
 
+    function saveScore() {
+        if (!curScore) return { error: "No score open" };
+
+        try {
+            cmd("file-save");
+            return { success: true, message: "Score saved" };
+        } catch (e) {
+            return { error: e.toString() };
+        }
+    }
+
     function goToBeginningOfScore() {
         var response = initCursorState();
         return { 
@@ -344,7 +357,7 @@ MuseScore {
             "selectCurrentMeasure", "insertMeasure", "goToFinalMeasure",
             "goToBeginningOfScore", "setTimeSignature", "addLyrics", "addInstrument",    
             "setStaffMute", "setInstrumentSound", "setTempo",
-            "addCursorElement", "addSlur", "addTie", "addHairpin",
+            "addCursorElement", "addSlur", "addTie", "addHairpin", "addVolta",
             "setVoice", "selectCustomRange", "syncStateToSelection"
         ];
 
@@ -762,8 +775,10 @@ MuseScore {
     function addCursorElement(params) {
         var resolved = resolveElementType(params);
         if (resolved.error) return resolved;
+        if (!curScore) return { error: "No score open" };
 
-        return executeWithUndo(function() {
+        curScore.startCmd();
+        try {
             syncStateToSelection();
             var cursor = createCursor();
             var elem = newElement(resolved.type);
@@ -776,6 +791,7 @@ MuseScore {
             }
 
             cursor.add(elem);
+            curScore.endCmd();
             syncStateToSelection();
 
             return {
@@ -783,7 +799,10 @@ MuseScore {
                 message: params.elementType + " added",
                 currentSelection: selectionState
             };
-        });
+        } catch (e) {
+            curScore.endCmd(true);
+            return { error: e.toString() };
+        }
     }
 
     function addSlur() {
@@ -798,6 +817,62 @@ MuseScore {
         var cmdName = (params && params.hairpinType === "diminuendo") ? "add-hairpin-reverse" : "add-hairpin";
         var label = (params && params.hairpinType || "crescendo") + " hairpin";
         return addCmdElement(cmdName, label);
+    }
+
+    function addVolta(params) {
+        if (!params || params.startMeasure === undefined || params.endMeasure === undefined) {
+            return { error: "startMeasure and endMeasure are required" };
+        }
+
+        return executeWithUndo(function() {
+            // Select the measure range for the volta
+            var cursor = createCursor({startTick: 0});
+            // Navigate to start measure
+            for (var i = 0; i < params.startMeasure - 1 && cursor.nextMeasure(); i++) {}
+            var startTick = cursor.tick;
+            var startStaff = 0;
+
+            // Navigate to end measure + 1 to get end tick
+            for (var j = params.startMeasure; j <= params.endMeasure && cursor.nextMeasure(); j++) {}
+            var endTick = cursor.tick;
+
+            // Select the range
+            curScore.selection.clear();
+            curScore.selection.selectRange(startTick, endTick, startStaff, startStaff + 1);
+
+            // Add volta via command
+            cmd("volta");
+            syncStateToSelection();
+
+            // Try to set volta properties on the last added element
+            // Walk through elements to find the volta we just added
+            var segment = curScore.firstSegment();
+            var voltaFound = false;
+            while (segment) {
+                var annotations = segment.annotations;
+                if (annotations) {
+                    for (var k = 0; k < annotations.length; k++) {
+                        var ann = annotations[k];
+                        if (ann && ann.name === "Volta" && ann.spannerTick && ann.spannerTick.ticks >= startTick) {
+                            if (params.text !== undefined) {
+                                ann.text = params.text;
+                            }
+                            voltaFound = true;
+                        }
+                    }
+                }
+                segment = segment.next;
+            }
+
+            return {
+                success: true,
+                message: "Volta added" + (voltaFound ? " with properties" : ""),
+                startMeasure: params.startMeasure,
+                endMeasure: params.endMeasure,
+                text: params.text || "",
+                currentSelection: selectionState
+            };
+        });
     }
 
     function addNote(params) {
@@ -1161,10 +1236,27 @@ MuseScore {
                 var staff = curScore.staves && curScore.staves[i] ||
                            (typeof curScore.staff === "function" ? curScore.staff(i) : null);
 
+                // Try to get transposition info from the staff's part/instrument
+                var transposeChromatic = 0;
+                var transposeDiatonic = 0;
+                try {
+                    if (staff && staff.part && staff.part.instrument) {
+                        var transpose = staff.part.instrument.transpose;
+                        if (transpose) {
+                            transposeChromatic = transpose.chromatic || 0;
+                            transposeDiatonic = transpose.diatonic || 0;
+                        }
+                    }
+                } catch (e) {
+                    // Transposition info not available for this staff
+                }
+
                 score.staves.push({
                     name: `staff${i}`,
                     shortName: staff ? staff.shortName : "",
-                    visible: staff ? !staff.invisible : true
+                    visible: staff ? !staff.invisible : true,
+                    transposeChromatic: transposeChromatic,
+                    transposeDiatonic: transposeDiatonic
                 });
             }
 

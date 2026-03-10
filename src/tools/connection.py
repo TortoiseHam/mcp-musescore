@@ -81,3 +81,15 @@ def setup_connection_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
         if parent:
             os.makedirs(parent, exist_ok=True)
         return await client.send_command("exportPdf", {"outputPath": output_path})
+
+    @mcp.tool()
+    async def save_score():
+        """Save the current score to disk.
+
+        Saves to the file path the score was loaded from.
+
+        Returns:
+            success: Whether the save succeeded
+            path: The file path the score was saved to
+        """
+        return await client.send_command("saveScore")

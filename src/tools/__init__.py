@@ -8,6 +8,7 @@ from .time_tempo import setup_time_tempo_tools
 from .sequences import setup_sequence_tools
 from .tips import setup_tips_tools
 from .elements import setup_element_tools
+from .notation import setup_notation_tools
 
 __all__ = [
     "setup_connection_tools",
@@ -18,4 +19,5 @@ __all__ = [
     "setup_sequence_tools",
     "setup_tips_tools",
     "setup_element_tools",
+    "setup_notation_tools",
 ]

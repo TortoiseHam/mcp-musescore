@@ -3,6 +3,7 @@
 from mcp.server.fastmcp import FastMCP
 
 from ..client import MuseScoreClient
+from ..pitch import parse_pitch
 
 
 def _validate_duration(duration: dict[str, int]) -> str | None:
@@ -20,11 +21,11 @@ def setup_notes_measures_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
     """Setup notes and measures tools."""
 
     @mcp.tool()
-    async def add_note(pitch: int = 64, duration: dict[str, int] | None = None, advance_cursor_after_action: bool = True):
+    async def add_note(pitch: int | str = 64, duration: dict[str, int] | None = None, advance_cursor_after_action: bool = True):
         """Add a note at the current cursor position with the specified pitch and duration.
 
         Args:
-            pitch: MIDI pitch value (0-127, where 60 is middle C)
+            pitch: MIDI pitch (0-127) or note name string like "C4", "Eb5", "F#4" (where C4 = middle C = MIDI 60)
             duration: Duration as {"numerator": int, "denominator": int} (e.g., {"numerator": 1, "denominator": 4} for quarter note)
             advance_cursor_after_action: Whether to move cursor to next position after adding note
 
@@ -36,8 +37,10 @@ def setup_notes_measures_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
         """
         if duration is None:
             duration = {"numerator": 1, "denominator": 4}
-        if not 0 <= pitch <= 127:
-            return {"error": "Pitch must be between 0 and 127"}
+        try:
+            pitch = parse_pitch(pitch)
+        except (ValueError, TypeError) as e:
+            return {"error": str(e)}
         err = _validate_duration(duration)
         if err:
             return {"error": err}
@@ -130,6 +133,33 @@ def setup_notes_measures_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
         if measure is not None:
             params["measure"] = measure
         return await client.send_command("deleteSelection", params)
+
+    @mcp.tool()
+    async def add_whole_rests(count: int = 1):
+        """Add one or more whole-measure rests at the current cursor position.
+
+        Useful for quickly filling empty measures. Each rest advances the cursor
+        to the next measure.
+
+        Args:
+            count: Number of whole rests to add (default 1)
+
+        Returns:
+            Result from processSequence with all added rests
+        """
+        if count < 1:
+            return {"error": "Count must be >= 1"}
+        sequence = [
+            {
+                "action": "addRest",
+                "params": {
+                    "duration": {"numerator": 1, "denominator": 1},
+                    "advanceCursorAfterAction": True,
+                },
+            }
+            for _ in range(count)
+        ]
+        return await client.send_command("processSequence", {"sequence": sequence})
 
     @mcp.tool()
     async def undo():
