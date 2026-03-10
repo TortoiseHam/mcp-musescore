@@ -122,17 +122,38 @@ def setup_element_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
         })
 
     @mcp.tool()
-    async def add_slur():
-        """Add a slur starting from the current selection.
+    async def add_slur(start_measure: int, end_measure: int,
+                       start_beat: float = 1, end_beat: float | None = None):
+        """Add a slur spanning a beat range.
 
-        The slur begins at the currently selected note. After calling this,
-        use next_element() to extend the slur, then call any note/navigation
-        tool to finalize it.
+        IMPORTANT: The slur must start on a note, not a rest. If start_beat
+        falls on a rest, the slur will not be created. Adjust start_beat to
+        the first note in the passage.
+
+        Args:
+            start_measure: First measure (1-based)
+            end_measure: Last measure (1-based)
+            start_beat: Beat within start measure (1-based, default 1).
+                Must land on a note, not a rest. Supports fractional beats:
+                1.5 = "and" of 1, 2.25 = first sixteenth after beat 2, etc.
+            end_beat: Beat within end measure (1-based, default end of measure).
+                Supports fractional beats.
 
         Returns:
             currentSelection: Updated selection state.
         """
-        return await client.send_command("addSlur")
+        if start_measure < 1 or end_measure < 1:
+            return {"error": "Measures must be >= 1"}
+        if end_measure < start_measure:
+            return {"error": "end_measure must be >= start_measure"}
+        params: dict = {
+            "startMeasure": start_measure,
+            "endMeasure": end_measure,
+            "startBeat": start_beat,
+        }
+        if end_beat is not None:
+            params["endBeat"] = end_beat
+        return await client.send_command("addSlur", params)
 
     @mcp.tool()
     async def add_tie():
@@ -146,18 +167,47 @@ def setup_element_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
         return await client.send_command("addTie")
 
     @mcp.tool()
-    async def add_hairpin(hairpin_type: str = "crescendo"):
-        """Add a crescendo or diminuendo hairpin at the current selection.
-
-        Select a range first (e.g. via select_current_measure or select_custom_range),
-        then call this to add the hairpin across that range.
+    async def add_hairpin(start_measure: int, end_measure: int,
+                          hairpin_type: str = "crescendo",
+                          start_beat: float = 1, end_beat: float | None = None):
+        """Add a crescendo or diminuendo hairpin spanning a beat range.
 
         Args:
+            start_measure: First measure (1-based)
+            end_measure: Last measure (1-based)
             hairpin_type: "crescendo" or "diminuendo"
+            start_beat: Beat within start measure (1-based, default 1).
+                Supports fractional beats: 1.5 = "and" of 1, 2.25 = first
+                sixteenth after beat 2, etc.
+            end_beat: Beat within end measure (1-based, default end of measure).
+                Supports fractional beats.
 
         Returns:
             currentSelection: Updated selection state.
         """
         if hairpin_type not in ("crescendo", "diminuendo"):
             return {"error": "hairpin_type must be 'crescendo' or 'diminuendo'"}
-        return await client.send_command("addHairpin", {"hairpinType": hairpin_type})
+        if start_measure < 1 or end_measure < 1:
+            return {"error": "Measures must be >= 1"}
+        if end_measure < start_measure:
+            return {"error": "end_measure must be >= start_measure"}
+        params: dict = {
+            "hairpinType": hairpin_type,
+            "startMeasure": start_measure,
+            "endMeasure": end_measure,
+            "startBeat": start_beat,
+        }
+        if end_beat is not None:
+            params["endBeat"] = end_beat
+        return await client.send_command("addHairpin", params)
+
+    @mcp.tool()
+    async def test_cmd(cmd_name: str):
+        """Test an arbitrary MuseScore cmd() call. For experimentation only.
+
+        Args:
+            cmd_name: The command name to pass to cmd() (e.g. "toggle-marcato")
+        """
+        if cmd_name == "testBarline":
+            return await client.send_command("testBarline", {})
+        return await client.send_command("testCmd", {"cmd": cmd_name})

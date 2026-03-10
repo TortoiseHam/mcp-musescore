@@ -1,6 +1,8 @@
 import QtQuick 2.9
 import MuseScore 3.0
 
+// NOTE: QML component-level declarations use "property var x" not "var x".
+// Using plain "var" outside a function will silently break the plugin on load.
 MuseScore {
     id: root
     menuPath: "Plugins.MuseScore API Server"
@@ -73,10 +75,12 @@ MuseScore {
             case "addTuplet":               return addTuplet(command.params);
             case "addLyrics":               return addLyrics(command.params);
             case "addCursorElement":        return addCursorElement(command.params);
-            case "addSlur":                 return addSlur();
+            case "addSlur":                 return addSlur(command.params);
             case "addTie":                  return addTie();
             case "addHairpin":              return addHairpin(command.params);
             case "addVolta":                return addVolta(command.params);
+            case "testCmd":                 return addCmdElement(command.params.cmd, command.params.cmd);
+            case "testBarline":             return testBarline(command.params);
 
             // Measures
             case "appendMeasure":           return appendMeasure(command.params);
@@ -126,6 +130,33 @@ MuseScore {
         cmd(cmdName);
         syncStateToSelection();
         return { success: true, message: label + " added", currentSelection: selectionState };
+    }
+
+    function testBarline(params) {
+        if (!curScore) return { error: "No score open" };
+        // Try to access measure object and its barline properties
+        var cursor = createCursor({startTick: 0});
+        var measure = cursor.measure;
+        var props = [];
+        if (measure) {
+            // Enumerate measure properties to find barline-related ones
+            try {
+                var testProps = [
+                    "lineBreakGenerated", "noBreak", "irregular",
+                    "repeatCount", "repeatStart", "repeatEnd", "repeatFlags"
+                ];
+                for (var i = 0; i < testProps.length; i++) {
+                    try {
+                        props.push(testProps[i] + "=" + measure[testProps[i]]);
+                    } catch(e) {
+                        props.push(testProps[i] + "=ERROR:" + e);
+                    }
+                }
+            } catch(e) {
+                props.push("enum error: " + e);
+            }
+        }
+        return { measure: !!measure, measureType: measure ? measure.name : "null", props: props };
     }
 
     function executeWithUndo(operation) {
@@ -773,6 +804,29 @@ MuseScore {
     // ========================================
 
     function addCursorElement(params) {
+        // Route FERMATA to dedicated handler (cursor.add doesn't work for fermata in MU4)
+        if (params && params.elementType === "FERMATA") {
+            return addFermata(params);
+        }
+
+        // Route ARTICULATION through cmd() — cursor.add() doesn't set subtype in MU4
+        // Supported: staccato, marcato, tenuto, trill, turn
+        if (params && params.elementType === "ARTICULATION" && params.properties && params.properties.subtype) {
+            var articulationCmds = {
+                "staccato": "add-staccato",
+                "marcato": "add-marcato",
+                "tenuto": "add-tenuto",
+                "trill": "add-trill",
+                "turn": "add-turn"
+            };
+            var cmdName = articulationCmds[params.properties.subtype];
+            if (cmdName) {
+                return addCmdElement(cmdName, "ARTICULATION (" + params.properties.subtype + ")");
+            }
+            return { error: "Unknown articulation subtype: " + params.properties.subtype +
+                     ". Supported: staccato, marcato, tenuto, trill, turn" };
+        }
+
         var resolved = resolveElementType(params);
         if (resolved.error) return resolved;
         if (!curScore) return { error: "No score open" };
@@ -805,8 +859,159 @@ MuseScore {
         }
     }
 
-    function addSlur() {
-        return addCmdElement("add-slur", "Slur");
+    // Dedicated fermata handler — cursor.add() has no FERMATA case in MU4,
+    // so we attach directly to the segment via undoAddElement
+    function addFermata(params) {
+        if (!curScore) return { error: "No score open" };
+
+        curScore.startCmd();
+        try {
+            syncStateToSelection();
+            var cursor = createCursor();
+            var segment = cursor.segment;
+            if (!segment) {
+                curScore.endCmd(true);
+                return { error: "No segment at cursor position" };
+            }
+
+            var fermata = newElement(Element.FERMATA);
+
+            if (params.properties) {
+                var keys = Object.keys(params.properties);
+                for (var i = 0; i < keys.length; i++) {
+                    fermata[keys[i]] = params.properties[keys[i]];
+                }
+            }
+
+            // In MU4, parent/track are read-only on new elements.
+            // Use cursor.add() which handles placement internally.
+            cursor.add(fermata);
+
+            curScore.endCmd();
+            syncStateToSelection();
+
+            return {
+                success: true,
+                message: "FERMATA added",
+                currentSelection: selectionState
+            };
+        } catch (e) {
+            curScore.endCmd(true);
+            return { error: "Fermata add failed: " + e.toString() };
+        }
+    }
+
+    // Shared helper: compute tick range for a measure range (does NOT select)
+    function getMeasureTickRange(startMeasure, endMeasure) {
+        var cursor = createCursor({startTick: 0});
+        for (var i = 0; i < startMeasure - 1 && cursor.nextMeasure(); i++) {}
+        var startTick = cursor.tick;
+        for (var j = startMeasure; j <= endMeasure && cursor.nextMeasure(); j++) {}
+        var endTick = cursor.tick;
+        return { startTick: startTick, endTick: endTick };
+    }
+
+    // Select note/rest elements to populate m_el for cmd() guard checks.
+    // selectRange() only sets segment range but NOT m_el, so spanner cmds fail.
+    // This selects the first element of each measure in the range.
+    // Beat params control the tick range for future sub-measure precision.
+    function selectNoteElements(startMeasure, endMeasure, startBeat, endBeat) {
+        // 480 ticks per quarter note beat (MuseScore standard resolution)
+        var TICKS_PER_BEAT = 480;
+
+        // Get tick positions from score summary (reliable, avoids cursor navigation bugs)
+        // getScoreSummary has its own executeWithUndo, so DON'T call this inside startCmd.
+        var score = getScoreSummary({startMeasure: startMeasure, endMeasure: endMeasure});
+        if (score.error) return score;
+        var measures = score.measures;
+        if (!measures || measures.length === 0) return { error: "No measures found" };
+
+        // Calculate precise tick range using beat offsets
+        var firstMeasureTick = measures[0].startTick;
+        var lastMeasureTick = measures[measures.length - 1].startTick;
+
+        var startTick = firstMeasureTick + (startBeat - 1) * TICKS_PER_BEAT;
+
+        var endTick;
+        if (endBeat && endBeat < 99) {
+            // End at specific beat within last measure
+            endTick = lastMeasureTick + endBeat * TICKS_PER_BEAT;
+        } else {
+            // End at end of last measure — get start of next measure
+            var afterScore = getScoreSummary({
+                startMeasure: endMeasure + 1, endMeasure: endMeasure + 1
+            });
+            if (!afterScore.error && afterScore.measures && afterScore.measures.length > 0) {
+                endTick = afterScore.measures[0].startTick;
+            } else {
+                endTick = lastMeasureTick + 1920; // fallback for last measure
+            }
+        }
+
+        var staffIdx = selectionState.startStaff || 0;
+
+        // Step 1: Move UI cursor to the target area via selectRange with precise ticks
+        // This may be needed as a side-effect for cmd() to work in the right region.
+        curScore.startCmd();
+        curScore.selection.clear();
+        curScore.selection.selectRange(startTick, endTick, staffIdx, staffIdx + 1);
+        curScore.endCmd();
+
+        // Step 2: Populate m_el by selecting note/rest elements within the tick range
+        // cmd("add-hairpin") checks noteOrRestSelected() which only checks m_el,
+        // not the segment range from selectRange().
+        curScore.startCmd();
+        for (var i = 0; i < measures.length; i++) {
+            // For each measure, walk through elements and select those in tick range
+            var staffKey = "staff" + staffIdx;
+            var elems = measures[i].elements[staffKey];
+            if (!elems) continue;
+            for (var j = 0; j < elems.length; j++) {
+                var elemTick = elems[j].startTick;
+                if (elemTick >= startTick && elemTick < endTick) {
+                    var c = createCursor({startTick: elemTick, startStaff: staffIdx});
+                    var curElem = c.element;
+                    if (curElem) {
+                        // First selection replaces, subsequent ones add
+                        var isFirst = (i === 0 && j === 0);
+                        curScore.selection.select(curElem, !isFirst);
+                    }
+                }
+            }
+        }
+        curScore.endCmd();
+
+        return {
+            success: true,
+            startTick: startTick,
+            endTick: endTick,
+            ticks: measures.map(function(m) { return m.startTick; })
+        };
+    }
+
+    function addSlur(params) {
+        if (!params || params.startMeasure === undefined || params.endMeasure === undefined) {
+            return { error: "startMeasure and endMeasure are required" };
+        }
+        if (!curScore) return { error: "No score open" };
+
+        var startBeat = params.startBeat || 1;
+        var endBeat = params.endBeat || 99;
+
+        var selResult = selectNoteElements(params.startMeasure, params.endMeasure, startBeat, endBeat);
+
+        if (selResult.error) return selResult;
+
+        cmd("add-slur");
+        syncStateToSelection();
+
+        return {
+            success: true,
+            message: "Slur added",
+            startMeasure: params.startMeasure,
+            endMeasure: params.endMeasure,
+            currentSelection: selectionState
+        };
     }
 
     function addTie() {
@@ -814,65 +1019,55 @@ MuseScore {
     }
 
     function addHairpin(params) {
-        var cmdName = (params && params.hairpinType === "diminuendo") ? "add-hairpin-reverse" : "add-hairpin";
-        var label = (params && params.hairpinType || "crescendo") + " hairpin";
-        return addCmdElement(cmdName, label);
+        if (!params || params.startMeasure === undefined || params.endMeasure === undefined) {
+            return { error: "startMeasure and endMeasure are required" };
+        }
+        if (!curScore) return { error: "No score open" };
+
+        var startBeat = params.startBeat || 1;
+        var endBeat = params.endBeat || 99; // large default = end of measure
+
+        // Select note elements to populate m_el (required for cmd() guard checks).
+        // selectNoteElements manages its own undo context — don't wrap in startCmd.
+        var selResult = selectNoteElements(params.startMeasure, params.endMeasure, startBeat, endBeat);
+
+        if (selResult.error) return selResult;
+
+        var cmdName = (params.hairpinType === "diminuendo") ? "add-hairpin-reverse" : "add-hairpin";
+        cmd(cmdName);
+        syncStateToSelection();
+
+        return {
+            success: true,
+            message: (params.hairpinType || "crescendo") + " hairpin added",
+            startMeasure: params.startMeasure,
+            endMeasure: params.endMeasure,
+            currentSelection: selectionState
+        };
     }
 
     function addVolta(params) {
         if (!params || params.startMeasure === undefined || params.endMeasure === undefined) {
             return { error: "startMeasure and endMeasure are required" };
         }
+        if (!curScore) return { error: "No score open" };
 
-        return executeWithUndo(function() {
-            // Select the measure range for the volta
-            var cursor = createCursor({startTick: 0});
-            // Navigate to start measure
-            for (var i = 0; i < params.startMeasure - 1 && cursor.nextMeasure(); i++) {}
-            var startTick = cursor.tick;
-            var startStaff = 0;
+        // Use selectNoteElements (selectRange + m_el population)
+        var selResult = selectNoteElements(params.startMeasure, params.endMeasure, 1, 99);
+        if (selResult.error) return selResult;
 
-            // Navigate to end measure + 1 to get end tick
-            for (var j = params.startMeasure; j <= params.endMeasure && cursor.nextMeasure(); j++) {}
-            var endTick = cursor.tick;
+        // cmd("volta") manages its own undo — don't wrap in executeWithUndo
+        cmd("volta");
+        syncStateToSelection();
 
-            // Select the range
-            curScore.selection.clear();
-            curScore.selection.selectRange(startTick, endTick, startStaff, startStaff + 1);
-
-            // Add volta via command
-            cmd("volta");
-            syncStateToSelection();
-
-            // Try to set volta properties on the last added element
-            // Walk through elements to find the volta we just added
-            var segment = curScore.firstSegment();
-            var voltaFound = false;
-            while (segment) {
-                var annotations = segment.annotations;
-                if (annotations) {
-                    for (var k = 0; k < annotations.length; k++) {
-                        var ann = annotations[k];
-                        if (ann && ann.name === "Volta" && ann.spannerTick && ann.spannerTick.ticks >= startTick) {
-                            if (params.text !== undefined) {
-                                ann.text = params.text;
-                            }
-                            voltaFound = true;
-                        }
-                    }
-                }
-                segment = segment.next;
-            }
-
-            return {
-                success: true,
-                message: "Volta added" + (voltaFound ? " with properties" : ""),
-                startMeasure: params.startMeasure,
-                endMeasure: params.endMeasure,
-                text: params.text || "",
-                currentSelection: selectionState
-            };
-        });
+        return {
+            success: true,
+            message: "Volta added",
+            startMeasure: params.startMeasure,
+            endMeasure: params.endMeasure,
+            text: params.text || "",
+            currentSelection: selectionState
+        };
     }
 
     function addNote(params) {

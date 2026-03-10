@@ -63,13 +63,13 @@ ELEMENT_INFO: dict[str, dict[str, Any]] = {
         "example": {"timeStretch": 2.0},
     },
     "ARTICULATION": {
-        "description": "Articulation marking (staccato, accent, tenuto, etc.). "
-                       "Set subtype to choose which articulation.",
+        "description": "Articulation marking. Set subtype to choose which articulation. "
+                       "Supported subtypes: staccato, marcato, tenuto, trill, turn.",
         "category": "cursor_attached",
         "common_properties": {
-            "subtype": "string — articulation symbol name",
+            "subtype": "string — one of: staccato, marcato, tenuto, trill, turn",
         },
-        "example": {},
+        "example": {"subtype": "staccato"},
     },
     "HARMONY": {
         "description": "Chord symbol (e.g. Cmaj7, Dm, G7)",
@@ -125,11 +125,14 @@ ELEMENT_INFO: dict[str, dict[str, Any]] = {
         "example": {},
     },
     "SLUR": {
-        "description": "Slur connecting notes. Select start note, call add_slur(), "
-                       "then navigate to end note. Works on current selection.",
+        "description": "Slur connecting notes across a measure range. "
+                       "Use add_slur(start_measure, end_measure).",
         "category": "cmd_shortcut",
-        "common_properties": {},
-        "example": {},
+        "common_properties": {
+            "start_measure": "int — first measure (1-based)",
+            "end_measure": "int — last measure (1-based)",
+        },
+        "example": {"start_measure": 1, "end_measure": 4},
     },
     "TIE": {
         "description": "Tie connecting two notes of the same pitch. "
@@ -139,13 +142,15 @@ ELEMENT_INFO: dict[str, dict[str, Any]] = {
         "example": {},
     },
     "HAIRPIN": {
-        "description": "Crescendo or diminuendo hairpin. "
-                       "Use add_hairpin(hairpin_type). Works on current selection.",
+        "description": "Crescendo or diminuendo hairpin spanning a measure range. "
+                       "Use add_hairpin(start_measure, end_measure, hairpin_type).",
         "category": "cmd_shortcut",
         "common_properties": {
             "hairpin_type": "string — 'crescendo' or 'diminuendo'",
+            "start_measure": "int — first measure (1-based)",
+            "end_measure": "int — last measure (1-based)",
         },
-        "example": {},
+        "example": {"start_measure": 4, "end_measure": 5, "hairpin_type": "crescendo"},
     },
     "VOLTA": {
         "description": "Volta bracket (repeat ending). "

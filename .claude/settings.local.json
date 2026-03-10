@@ -9,7 +9,9 @@
       "Bash(git:*)",
       "Bash(timeout 3 uv run:*)",
       "Bash(uv run:*)",
-      "Bash(uv sync --group dev)"
+      "Bash(uv sync --group dev)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs"
     ]
   }
 }

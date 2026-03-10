@@ -213,9 +213,16 @@ class AddCursorElementAction(TypedDict):
     params: AddCursorElementParams
 
 
+class AddSlurParams(TypedDict):
+    startMeasure: int
+    endMeasure: int
+    startBeat: NotRequired[float]
+    endBeat: NotRequired[float]
+
+
 class AddSlurAction(TypedDict):
     action: Literal["addSlur"]
-    params: dict[str, Any]
+    params: AddSlurParams
 
 
 class AddTieAction(TypedDict):
@@ -225,6 +232,10 @@ class AddTieAction(TypedDict):
 
 class AddHairpinParams(TypedDict):
     hairpinType: str
+    startMeasure: int
+    endMeasure: int
+    startBeat: NotRequired[float]
+    endBeat: NotRequired[float]
 
 
 class AddHairpinAction(TypedDict):
