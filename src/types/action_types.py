@@ -1,13 +1,12 @@
 """TypedDict definitions for MuseScore MCP action sequences."""
 
-from typing import Dict, Any, List, Literal, Optional
-from typing_extensions import TypedDict, NotRequired
+from typing import Any, Literal, NotRequired, TypedDict
 
 
 class GetScoreParams(TypedDict, total=False):
     startMeasure: int
     endMeasure: int
-    staves: List[int]
+    staves: list[int]
 
 
 class GetScoreAction(TypedDict):
@@ -17,7 +16,7 @@ class GetScoreAction(TypedDict):
 
 class AddNoteParams(TypedDict):
     pitch: int
-    duration: Dict[Literal["numerator", "denominator"], int]
+    duration: dict[Literal["numerator", "denominator"], int]
     advanceCursorAfterAction: bool
 
 
@@ -27,7 +26,7 @@ class AddNoteAction(TypedDict):
 
 
 class AddRestParams(TypedDict):
-    duration: Dict[Literal["numerator", "denominator"], int]
+    duration: dict[Literal["numerator", "denominator"], int]
     advanceCursorAfterAction: bool
 
 
@@ -37,8 +36,8 @@ class AddRestAction(TypedDict):
 
 
 class AddTupletParams(TypedDict):
-    duration: Dict[Literal["numerator", "denominator"], int]
-    ratio: Dict[Literal["numerator", "denominator"], int]
+    duration: dict[Literal["numerator", "denominator"], int]
+    ratio: dict[Literal["numerator", "denominator"], int]
     advanceCursorAfterAction: bool
 
 
@@ -48,7 +47,7 @@ class AddTupletAction(TypedDict):
 
 
 class AddLyricsParams(TypedDict):
-    lyrics: List[str]
+    lyrics: list[str]
     verse: int
 
 
@@ -88,12 +87,12 @@ class SetInstrumentSoundAction(TypedDict):
 
 class AppendMeasureAction(TypedDict):
     action: Literal["appendMeasure"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class DeleteSelectionAction(TypedDict):
     action: Literal["deleteSelection"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class GetCursorInfoParams(TypedDict, total=False):
@@ -134,22 +133,22 @@ class PrevElementAction(TypedDict):
 
 class SelectCurrentMeasureAction(TypedDict):
     action: Literal["selectCurrentMeasure"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class InsertMeasureAction(TypedDict):
     action: Literal["insertMeasure"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class GoToFinalMeasureAction(TypedDict):
     action: Literal["goToFinalMeasure"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class GoToBeginningOfScoreAction(TypedDict):
     action: Literal["goToBeginningOfScore"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class SetTimeSignatureParams(TypedDict):
@@ -164,17 +163,17 @@ class SetTimeSignatureAction(TypedDict):
 
 class UndoAction(TypedDict):
     action: Literal["undo"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class NextStaffAction(TypedDict):
     action: Literal["nextStaff"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class PrevStaffAction(TypedDict):
     action: Literal["prevStaff"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class SetTempoParams(TypedDict):
@@ -201,12 +200,12 @@ class SelectCustomRangeAction(TypedDict):
 
 class SyncStateToSelectionAction(TypedDict):
     action: Literal["syncStateToSelection"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class AddCursorElementParams(TypedDict):
     elementType: str
-    properties: NotRequired[Dict[str, Any]]
+    properties: NotRequired[dict[str, Any]]
 
 
 class AddCursorElementAction(TypedDict):
@@ -216,12 +215,12 @@ class AddCursorElementAction(TypedDict):
 
 class AddSlurAction(TypedDict):
     action: Literal["addSlur"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class AddTieAction(TypedDict):
     action: Literal["addTie"]
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class AddHairpinParams(TypedDict):
@@ -251,7 +250,7 @@ class SetVoiceAction(TypedDict):
     params: SetVoiceParams
 
 
-ActionSequence = List[
+ActionSequence = list[
     GetScoreAction | AddNoteAction | AddRestAction | AddTupletAction |
     AddLyricsAction | AddInstrumentAction | SetStaffMuteAction |
     SetInstrumentSoundAction | AppendMeasureAction | DeleteSelectionAction |

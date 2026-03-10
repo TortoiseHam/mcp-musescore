@@ -1,11 +1,13 @@
 """Connection and utility tools for MuseScore MCP."""
 
 import os
-from typing import List, Optional
+
+from mcp.server.fastmcp import FastMCP
+
 from ..client import MuseScoreClient
 
 
-def setup_connection_tools(mcp, client: MuseScoreClient):
+def setup_connection_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
     """Setup connection and utility tools."""
 
     @mcp.tool()
@@ -20,7 +22,7 @@ def setup_connection_tools(mcp, client: MuseScoreClient):
         return await client.send_command("ping")
 
     @mcp.tool()
-    async def get_score(start_measure: Optional[int] = None, end_measure: Optional[int] = None, staves: Optional[List[int]] = None):
+    async def get_score(start_measure: int | None = None, end_measure: int | None = None, staves: list[int] | None = None):
         """Get information about the current score, optionally filtered.
 
         Args:

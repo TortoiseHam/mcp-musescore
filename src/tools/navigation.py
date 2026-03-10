@@ -1,9 +1,11 @@
 """Cursor and navigation tools for MuseScore MCP."""
 
+from mcp.server.fastmcp import FastMCP
+
 from ..client import MuseScoreClient
 
 
-def setup_navigation_tools(mcp, client: MuseScoreClient):
+def setup_navigation_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
     """Setup cursor and navigation tools."""
 
     @mcp.tool()

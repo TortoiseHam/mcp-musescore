@@ -1,6 +1,6 @@
 """Static registry of MuseScore element types for discovery."""
 
-from typing import Dict, List, Any
+from typing import Any
 
 ELEMENT_CATEGORIES = {
     "cursor_attached": {
@@ -19,7 +19,7 @@ ELEMENT_CATEGORIES = {
     },
 }
 
-ELEMENT_INFO: Dict[str, Dict[str, Any]] = {
+ELEMENT_INFO: dict[str, dict[str, Any]] = {
     "DYNAMIC": {
         "description": "Dynamic marking (pp, p, mp, mf, f, ff, etc.)",
         "category": "cursor_attached",
@@ -150,19 +150,19 @@ ELEMENT_INFO: Dict[str, Dict[str, Any]] = {
 }
 
 
-def get_element_categories() -> Dict[str, Any]:
+def get_element_categories() -> dict[str, Any]:
     """Return all categories with their element lists."""
     return ELEMENT_CATEGORIES
 
 
-def get_all_element_types() -> List[str]:
+def get_all_element_types() -> list[str]:
     """Return all element type names across all categories."""
-    types = []
+    types: list[str] = []
     for cat in ELEMENT_CATEGORIES.values():
         types.extend(cat["elements"])
     return types
 
 
-def get_element_info(element_type: str) -> Dict[str, Any]:
+def get_element_info(element_type: str) -> dict[str, Any]:
     """Return info about a specific element type."""
     return ELEMENT_INFO.get(element_type, {})

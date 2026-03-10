@@ -1,15 +1,18 @@
 """Element discovery and generic element tools for MuseScore MCP."""
 
-from typing import Optional
+from typing import Any
+
+from mcp.server.fastmcp import FastMCP
+
 from ..client import MuseScoreClient
 from ..registry import get_element_categories, get_element_info, get_all_element_types
 
 
-def setup_element_tools(mcp, client: MuseScoreClient):
+def setup_element_tools(mcp: FastMCP, client: MuseScoreClient) -> None:
     """Setup generic element and discovery tools."""
 
     @mcp.tool()
-    async def list_elements(category: Optional[str] = None):
+    async def list_elements(category: str | None = None):
         """List available MuseScore element types, optionally filtered by category.
 
         Args:
@@ -65,7 +68,7 @@ def setup_element_tools(mcp, client: MuseScoreClient):
         return result
 
     @mcp.tool()
-    async def add_cursor_element(element_type: str, properties: Optional[dict] = None):
+    async def add_cursor_element(element_type: str, properties: dict[str, Any] | None = None):
         """Add an element at the current cursor position.
 
         Use list_elements() to see available types, and describe_element() to see
@@ -89,7 +92,7 @@ def setup_element_tools(mcp, client: MuseScoreClient):
         if info.get("category") != "cursor_attached":
             return {"error": f"{element_type} is not cursor-attached. "
                     f"Category: {info.get('category')}. See its description for the right tool."}
-        params = {"elementType": element_type}
+        params: dict[str, Any] = {"elementType": element_type}
         if properties:
             params["properties"] = properties
         return await client.send_command("addCursorElement", params)
