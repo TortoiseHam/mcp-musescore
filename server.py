@@ -11,7 +11,6 @@ from src.tools import (
     setup_staff_instruments_tools,
     setup_time_tempo_tools,
     setup_sequence_tools,
-    setup_tips_tools,
     setup_element_tools,
     setup_notation_tools,
 )
@@ -24,8 +23,133 @@ logging.basicConfig(
 )
 logger = logging.getLogger("MuseScoreMCP")
 
+INSTRUCTIONS = """\
+# PDF-to-MuseScore Transcription Guide
+
+When transcribing a PDF score into MuseScore via this MCP server, follow a phased approach. Trying to do everything in a single pass leads to mistakes and makes it harder to catch errors. Work through the score multiple times, each pass focusing on a different layer.
+
+For long or complex scores, the key principle is: **keep your working context small and verifiable.** Never try to hold the entire score in your head at once. Work in short sections, verify often, and build up incrementally.
+
+## Phase 0: Reconnaissance
+
+Before touching MuseScore, study the PDF and build a mental map of the piece. This phase prevents the most common catastrophic errors (wrong measure count, missed repeats, misidentified structure).
+
+1. **Count measures carefully** — Go through the PDF and count total measures, grouped by system (line) and page. Write down: "Page 1: systems of 4, 4, 4 measures = 12. Page 2: 4, 4, 4, 3 = 15..." Off-by-one measure errors cascade through the entire transcription and are extremely painful to fix later.
+2. **Map the form** — Identify the large-scale structure: intro, verse, chorus, bridge, coda, etc. Note which sections repeat and which are unique. A typical pop song might have only 30-40 measures of unique material despite being 80+ measures long.
+3. **Identify repeated/copied sections** — Flag sections that are identical or near-identical to earlier ones. You'll transcribe these once and duplicate, potentially cutting your work in half or more.
+4. **Note hazards** — Flag anything tricky: key changes, meter changes, cue notes, ossia staves, complex tuplet nesting, divisi passages, cross-staff notation, polyphonic passages requiring multiple voices. Knowing where the hard parts are lets you plan around them.
+5. **Catalog the elements** — Make a quick inventory: How many instruments? Any transposing instruments? Lyrics? Multiple verses? What dynamics and articulations are used? Use `list_elements()` to see all available element types if you're unsure what's supported. This determines which phases you'll need.
+
+## Phase 1: Score Setup
+
+With your map in hand, set up the skeleton:
+
+1. **Instruments & staves** — Add all instruments/staves in the correct order using `add_instrument()`. Match the PDF's layout top to bottom.
+2. **Time signature** — Set the initial time signature with `set_time_signature()`. If it changes mid-piece, you'll handle that in Phase 2.
+3. **Key signature** — Set the initial key signature using `add_cursor_element("KEYSIG", {"key": n})` where n is negative for flats, 0 for C major, positive for sharps (e.g., -3 for Eb major, 2 for D major).
+4. **Tempo** — Set the initial tempo with `set_tempo(bpm, text)`. Use the optional `text` parameter for markings like "Allegro" or "Andante con moto".
+5. **Measures** — Use `append_measure()` to create the exact number of measures from your Phase 0 count. Getting this right now saves enormous headaches later.
+
+## Phase 2: Structure & Road Map
+
+Walk through the PDF and mark up the structural elements that define the road map of the piece. Use `go_to_measure()` to navigate to each location. This pass is about getting the form right before filling in content:
+
+1. **Key signature changes** — Navigate to the measure where the key changes and use `add_cursor_element("KEYSIG", {"key": n})`.
+2. **Time signature changes** — If the meter changes mid-piece, place those with `set_time_signature()`.
+3. **Tempo changes** — Use `set_tempo()` at each tempo change. Use the `text` parameter for markings like "Allegro", "rit.", etc.
+4. **Rehearsal marks** — Place with `add_cursor_element("REHEARSAL_MARK", {"text": "A"})`.
+5. **Repeat barlines & endings** — Use `add_cursor_element("BAR_LINE", {"subtypeName": "start-repeat"})` for repeat signs. Available subtypes: normal, double, start-repeat, end-repeat, end-start-repeat, end. For volta brackets (1st/2nd endings), use `add_volta(text="1.", endings=[1], start_measure=5, end_measure=8)`. D.C., D.S., coda, and segno markings may need manual placement in MuseScore. Getting repeats right early prevents measure-numbering confusion later.
+6. **Double barlines and final barlines** — Use `add_cursor_element("BAR_LINE", {"subtypeName": "double"})` or `"end"` for the final barline.
+
+## Phase 3: Notes & Rhythms
+
+Now fill in the actual musical content. **Work in short sections (8-16 measures) across all staves, not one staff through the entire piece.** This keeps your working context small, makes verification possible, and lets you check that the vertical harmony between parts makes sense.
+
+### Preferred: Bulk notation with `add_notes_from_string()`
+
+The fastest way to enter notes is with the compact notation string format:
+
+```
+add_notes_from_string("r/4 Eb5/4 F5/4 G5/4 | Ab5/1 | R*7", staff=0, measure=1)
+```
+
+**Notation format:**
+- Notes: `Eb5/4` (pitch/duration), `F#4/8` (eighth note)
+- Dotted: `Eb5/4.` (dotted quarter), `C5/2..` (double-dotted half)
+- Rests: `r/4` (quarter rest), `r/1` (whole rest)
+- Ties: `Eb5/4~` (tie to next note of same pitch)
+- Multi-measure rest: `R*3` (3 measures of whole rests)
+- Barlines: `|` (visual separator, ignored by parser)
+- Common durations: /1=whole, /2=half, /4=quarter, /8=eighth, /16=sixteenth
+
+For empty measures, use `add_whole_rests(count)` to quickly fill them.
+
+### Note names instead of MIDI numbers
+
+All pitch parameters accept note name strings: `"C4"` (middle C), `"Eb5"`, `"F#4"`, `"Bb3"`. This works in `add_note()`, `add_notes_from_string()`, and `processSequence`.
+
+### Section-by-section workflow:
+
+For each section (e.g., measures 1-8, then 9-16, etc.):
+
+1. **Enter notes for all staves in this section** — Use `add_notes_from_string()` with `staff` and `measure` params to enter a full measure or two at a time. For individual notes, `add_note(pitch="Eb5")` also works. Complete all staves for this section before moving on.
+2. **Tuplets** — Use `add_tuplet()` when you encounter triplets or other irregular groupings.
+3. **Ties** — Use `add_tie()` when a note is tied to the next note of the same pitch, or use the `~` suffix in notation strings.
+4. **Multiple voices** — For polyphonic passages on a single staff (e.g., soprano + alto on one treble staff), use `set_voice()` to switch between voices 0-3. Enter all of voice 0 for the section first, then go back and enter voice 1, etc.
+5. **Use `processSequence` for efficiency, but keep batches small** — Batch 1-2 measures at a time. `add_notes_from_string()` handles this automatically. The sweet spot is batching enough to be efficient but small enough that mistakes are cheap to fix.
+6. **Verification gate** — After completing each section, STOP and verify against the PDF before moving to the next section. Use `get_score_text(start_measure, end_measure)` for a quick human-readable check — this shows notes in the same format you entered them. Use `get_score()` for detailed JSON if needed. Do not proceed until the section is correct.
+
+### Exploiting repetition:
+
+After transcribing unique sections, duplicate material for repeated sections rather than re-transcribing from scratch. If measures 33-48 are identical to measures 1-16, copy rather than re-enter. This is faster and eliminates a source of inconsistency.
+
+## Phase 4: Articulations, Dynamics & Expression
+
+With all the notes in place, add the expressive layer. Navigate to each note/position with `go_to_measure()` and `next_element()`/`prev_element()`. Work section by section.
+
+Use `list_elements()` to see all available element types and `describe_element()` to check properties for any specific type.
+
+1. **Dynamics** — Use `add_cursor_element("DYNAMIC", {"text": "mf", "velocity": 80})`. Common values: pp=31, p=49, mp=64, mf=80, f=96, ff=112.
+2. **Hairpins** — Select a range first with `select_current_measure()` or `select_custom_range()`, then use `add_hairpin("crescendo")` or `add_hairpin("diminuendo")`.
+3. **Articulations** — Use `add_cursor_element("ARTICULATION", {"subtype": "..."})`. Use `describe_element("ARTICULATION", runtime_properties=True)` to discover available subtypes.
+4. **Fermatas** — Use `add_cursor_element("FERMATA", {"timeStretch": 2.0})`.
+5. **Slurs & phrase marks** — Navigate to the start note and call `add_slur()`. The slur begins at the selection; use `next_element()` to extend it, then any navigation/note tool to finalize.
+6. **Text expressions** — Use `add_cursor_element("STAFF_TEXT", {"text": "dolce"})` for staff-specific text, or `add_cursor_element("SYSTEM_TEXT", {"text": "rit."})` for text above all staves.
+7. **Chord symbols** — Use `add_cursor_element("HARMONY", {"text": "Cmaj7"})`.
+
+## Phase 5: Lyrics (if applicable)
+
+If the score has vocal parts with lyrics:
+
+1. **Enter lyrics verse by verse** — Use `add_lyrics()` to attach words to notes. Do verse 1 for the entire piece, then verse 2, etc. Use the `verse` parameter (0-based) to specify which verse.
+2. **Syllable alignment** — Pay attention to syllable breaks (hyphens) and melisma (underscores/extender lines) in the PDF.
+
+## Phase 6: Review & Cleanup
+
+Use a **Verifier subagent** for independent review — you cannot reliably catch your own mistakes.
+
+1. **Export your transcription** — Use `export_pdf()` to generate a PDF of your work.
+2. **Spawn a Verifier subagent** — Give it the exported PDF and the original source PDF(s). Ask it to compare them section by section and report every discrepancy it finds: wrong notes, missing dynamics, incorrect rhythms, missing articulations, etc. A fresh agent reviewing your output will catch errors that you will miss when self-reviewing.
+3. **Apply corrections** — Fix each discrepancy the Verifier identified. For large correction lists, work through them in order rather than trying to batch everything.
+4. **Re-verify if needed** — For complex scores or many corrections, export again and run another Verifier pass. Repeat until the Verifier reports no issues.
+5. **Final spot-checks** — Use `get_score(start_measure, end_measure, staves)` to inspect any sections the Verifier flagged as borderline. Use `get_score_text()` for a quick human-readable comparison.
+
+## General Tips
+
+- **Use `undo()` liberally** — If something goes wrong, undo and try again. It's cheap and reliable.
+- **Octave awareness** — Use note names like `"C4"` (middle C) instead of MIDI numbers to reduce octave errors. If using MIDI: Middle C = 60, each octave = 12 semitones.
+- **Read ahead in the PDF** — Before transcribing a section, scan it for repeats, key changes, or meter changes that affect how you set up the measures.
+- **Enharmonic spellings** — MuseScore may spell a note differently than the PDF (e.g., F# vs Gb). Note these for later correction.
+- **Transposing instruments** — If the PDF shows a transposing part (e.g., Bb Clarinet, F Horn), use `written_pitch=True` in `add_notes_from_string()` and `get_score_text()` to work in written pitch. The tools will automatically convert using the instrument's transposition info from the score.
+- **Use `get_score_text()` for quick verification** — Returns human-readable notation like `m1 staff0: Eb5/4 F5/4 G5/4 Ab5/4`. Much easier to compare against a PDF than raw JSON. Use `get_score()` when you need detailed element data.
+- **Use `get_cursor_info(verbose=False)` for quick checks** — When you just need to know what's at the current position without a full score summary, set verbose to False for a faster response.
+- **Discover element capabilities** — Use `list_elements()` to see what element types are available, and `describe_element(type, runtime_properties=True)` to see all settable properties for a type.
+- **Don't fight momentum** — If a particular passage is proving difficult, mark it and move on. Come back to hard spots after the easy sections are done. Getting 90% of the score entered correctly is better than getting stuck on measure 12.
+- **Treat the PDF page layout as a reference grid** — Know which measures are on which page and system. When you need to re-check something, you can go straight to the right spot in the PDF instead of scanning through the whole document.
+"""
+
 # Create the MCP app and client
-mcp = FastMCP("MuseScore Assistant")
+mcp = FastMCP("MuseScore Assistant", instructions=INSTRUCTIONS)
 client = MuseScoreClient()
 
 # Setup all tool categories
@@ -35,7 +159,6 @@ setup_notes_measures_tools(mcp, client)
 setup_staff_instruments_tools(mcp, client)
 setup_time_tempo_tools(mcp, client)
 setup_sequence_tools(mcp, client)
-setup_tips_tools(mcp)
 setup_element_tools(mcp, client)
 setup_notation_tools(mcp, client)
 
